@@ -8,7 +8,7 @@ load_dotenv()
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql+psycopg2://postgres:123@localhost:5432/skladai"
-).replace("postgresql+psycopg://", "postgresql+psycopg2://")
+).replace("postgresql+psycopg://", "postgresql+psycopg2://").replace("postgresql://", "postgresql+psycopg2://")
 
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
