@@ -1,0 +1,38 @@
+# Виртуальное окружение
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+
+# Переменные окружения (пароли, ключи)
+.env
+.env.local
+.env.production
+
+# База данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Логи
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Alembic (оставляем миграции, но не кэш)
+alembic/__pycache__/
