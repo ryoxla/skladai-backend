@@ -39,8 +39,10 @@ def recalculate_counterparty_balance(db: Session, counterparty_id: int):
     """Полный пересчёт баланса контрагента по всем проведённым документам и транзакциям."""
     result = db.execute(text("""
         SELECT COALESCE(SUM(CASE doc_type
-            WHEN 'shipment'   THEN total_amount
-            WHEN 'return_out' THEN -total_amount
+            WHEN 'receipt'    THEN total_amount
+            WHEN 'return_in'  THEN -total_amount
+            WHEN 'shipment'   THEN -total_amount
+            WHEN 'return_out' THEN total_amount
             ELSE 0
         END), 0) as doc_balance
         FROM documents
