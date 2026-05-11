@@ -1,14 +1,74 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from decimal import Decimal
 from database import get_db
-from models import Transaction, User
+from models import Transaction, Account, Counterparty, User
 from schemas import TransactionCreate, TransactionOut, MessageResponse
 from routers.auth import get_current_user, require_role
 from typing import List, Optional
 from datetime import date
 
 router = APIRouter()
+
+
+def recalculate_account_balance(db: Session, account_id: int):
+    """Пересчёт баланса счёта по всем транзакциям."""
+    result = db.execute(text("""
+        SELECT COALESCE(SUM(CASE txn_type
+            WHEN 'income'   THEN amount
+            WHEN 'expense'  THEN -amount
+            WHEN 'transfer' THEN -amount
+            ELSE 0
+        END), 0) as balance
+        FROM transactions
+        WHERE account_id = :acc_id
+    """), {"acc_id": account_id})
+    balance = result.scalar() or Decimal("0")
+
+    # Если счёт является получателем перевода
+    result2 = db.execute(text("""
+        SELECT COALESCE(SUM(amount), 0) as incoming
+        FROM transactions
+        WHERE account_to_id = :acc_id AND txn_type = 'transfer'
+    """), {"acc_id": account_id})
+    incoming = result2.scalar() or Decimal("0")
+
+    acc = db.query(Account).filter(Account.id == account_id).first()
+    if acc:
+        acc.balance = balance + incoming
+
+
+def recalculate_counterparty_balance(db: Session, counterparty_id: int):
+    """Пересчёт баланса контрагента по документам и транзакциям."""
+    result = db.execute(text("""
+        SELECT COALESCE(SUM(CASE doc_type
+            WHEN 'receipt'    THEN total_amount
+            WHEN 'return_in'  THEN -total_amount
+            WHEN 'shipment'   THEN -total_amount
+            WHEN 'return_out' THEN total_amount
+            ELSE 0
+        END), 0) as doc_balance
+        FROM documents
+        WHERE counterparty_id = :cp_id AND status = 'confirmed'
+    """), {"cp_id": counterparty_id})
+    doc_balance = result.scalar() or Decimal("0")
+
+    result2 = db.execute(text("""
+        SELECT COALESCE(SUM(CASE txn_type
+            WHEN 'income'  THEN -amount
+            WHEN 'expense' THEN  amount
+            ELSE 0
+        END), 0) as txn_balance
+        FROM transactions
+        WHERE counterparty_id = :cp_id
+    """), {"cp_id": counterparty_id})
+    txn_balance = result2.scalar() or Decimal("0")
+
+    cp = db.query(Counterparty).filter(Counterparty.id == counterparty_id).first()
+    if cp:
+        cp.balance = doc_balance + txn_balance
+
 
 @router.get("/", response_model=List[TransactionOut])
 def list_transactions(
@@ -47,6 +107,7 @@ def list_transactions(
     result = db.execute(text(query), params)
     return [dict(r._mapping) for r in result]
 
+
 @router.get("/summary")
 def cashflow_summary(
     db: Session = Depends(get_db),
@@ -56,6 +117,7 @@ def cashflow_summary(
         "SELECT * FROM v_cashflow_monthly ORDER BY month DESC LIMIT 12"
     ))
     return [dict(r._mapping) for r in result]
+
 
 @router.get("/{txn_id}", response_model=TransactionOut)
 def get_transaction(
@@ -75,6 +137,7 @@ def get_transaction(
         raise HTTPException(404, "Операция не найдена")
     return dict(row)
 
+
 @router.post("/", response_model=MessageResponse, status_code=201)
 def create_transaction(
     data: TransactionCreate,
@@ -83,10 +146,23 @@ def create_transaction(
 ):
     if data.txn_type == "transfer" and not data.account_to_id:
         raise HTTPException(400, "Для перевода укажите account_to_id")
+
     txn = Transaction(**data.model_dump())
     db.add(txn)
     db.flush()
+
+    # Пересчёт баланса счёта
+    if txn.account_id:
+        recalculate_account_balance(db, txn.account_id)
+    if txn.account_to_id:
+        recalculate_account_balance(db, txn.account_to_id)
+
+    # Пересчёт баланса контрагента
+    if txn.counterparty_id:
+        recalculate_counterparty_balance(db, txn.counterparty_id)
+
     return {"message": "Операция создана", "id": txn.id}
+
 
 @router.delete("/{txn_id}", response_model=MessageResponse)
 def delete_transaction(
@@ -97,5 +173,22 @@ def delete_transaction(
     txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
     if not txn:
         raise HTTPException(404, "Операция не найдена")
+
+    account_id = txn.account_id
+    account_to_id = txn.account_to_id
+    counterparty_id = txn.counterparty_id
+
     db.delete(txn)
+    db.flush()
+
+    # Пересчёт баланса счёта после удаления
+    if account_id:
+        recalculate_account_balance(db, account_id)
+    if account_to_id:
+        recalculate_account_balance(db, account_to_id)
+
+    # Пересчёт баланса контрагента после удаления
+    if counterparty_id:
+        recalculate_counterparty_balance(db, counterparty_id)
+
     return {"message": "Операция удалена"}
