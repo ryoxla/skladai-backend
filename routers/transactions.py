@@ -55,8 +55,8 @@ def recalculate_counterparty_balance(db: Session, counterparty_id: int):
 
     result2 = db.execute(text("""
         SELECT COALESCE(SUM(CASE txn_type
-            WHEN 'income'  THEN -amount
-            WHEN 'expense' THEN  amount
+            WHEN 'income'  THEN  amount
+            WHEN 'expense' THEN -amount
             ELSE 0
         END), 0) as txn_balance
         FROM transactions

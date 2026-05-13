@@ -52,3 +52,32 @@ def run_migrations():
         logger.info("Migration 002 (transactions.status) applied successfully")
     except Exception as e:
         logger.warning("Migration 002 skipped or failed (may be harmless): %s", e)
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE counterparties cp
+                SET balance = (
+                    SELECT COALESCE(SUM(CASE doc_type
+                        WHEN 'receipt'    THEN total_amount
+                        WHEN 'return_in'  THEN -total_amount
+                        WHEN 'shipment'   THEN -total_amount
+                        WHEN 'return_out' THEN total_amount
+                        ELSE 0
+                    END), 0)
+                    FROM documents
+                    WHERE counterparty_id = cp.id AND status = 'confirmed'
+                ) + (
+                    SELECT COALESCE(SUM(CASE txn_type
+                        WHEN 'income'  THEN  amount
+                        WHEN 'expense' THEN -amount
+                        ELSE 0
+                    END), 0)
+                    FROM transactions
+                    WHERE counterparty_id = cp.id AND status = 'confirmed'
+                )
+            """))
+            conn.commit()
+        logger.info("Migration 003 (recalculate counterparty balances) applied successfully")
+    except Exception as e:
+        logger.warning("Migration 003 skipped or failed (may be harmless): %s", e)
