@@ -154,6 +154,7 @@ class Transaction(Base):
     id               = Column(Integer, primary_key=True)
     txn_date         = Column(Date, nullable=False)
     txn_type         = Column(SAEnum(TxnTypeEnum), nullable=False)
+    status           = Column(String(20), nullable=False, default="draft", server_default="draft")
     account_id       = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     account_to_id    = Column(Integer, ForeignKey("accounts.id"))
     amount           = Column(Numeric(15, 2), nullable=False)

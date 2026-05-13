@@ -647,20 +647,54 @@ async function loadFinance(type=null) {
   try {
     allTxns = await api('/transactions/'+(type&&type!=='all'?'?txn_type='+type:''));
     document.getElementById('finance-table').innerHTML = !allTxns.length ? '<div class="empty">Операций нет</div>'
-      : `<table><thead><tr><th>Дата</th><th>Тип</th><th>Счёт</th><th>Описание</th><th>Контрагент</th><th>Категория</th><th style="text-align:right">Сумма</th><th></th></tr></thead><tbody>${allTxns.map(t=>`<tr><td class="mono">${fmtDate(t.txn_date)}</td><td><span class="badge ${t.txn_type==='income'?'badge-green':t.txn_type==='expense'?'badge-red':'badge-blue'}">${t.txn_type==='income'?'Приход':t.txn_type==='expense'?'Расход':'Перевод'}</span></td><td>${esc(t.account_name||'—')}</td><td>${esc(t.description)}</td><td>${esc(t.counterparty_name||'—')}</td><td>${esc(t.category||'—')}</td><td style="text-align:right" class="${t.txn_type==='income'?'amount-pos':'amount-neg'}">${t.txn_type==='income'?'+':'−'}${fmt(t.amount)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteTxn(${t.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
+      : `<table><thead><tr><th>Дата</th><th>Тип</th><th>Статус</th><th>Счёт</th><th>Описание</th><th>Контрагент</th><th>Категория</th><th style="text-align:right">Сумма</th><th></th></tr></thead><tbody>${allTxns.map(t=>`<tr>
+        <td class="mono">${fmtDate(t.txn_date)}</td>
+        <td><span class="badge ${t.txn_type==='income'?'badge-green':t.txn_type==='expense'?'badge-red':'badge-blue'}">${t.txn_type==='income'?'Приход':t.txn_type==='expense'?'Расход':'Перевод'}</span></td>
+        <td><span class="badge ${t.status==='confirmed'?'badge-green':'badge-gray'}">${t.status==='confirmed'?'Проведена':'Не проведена'}</span></td>
+        <td>${esc(t.account_name||'—')}</td>
+        <td>${esc(t.description)}</td>
+        <td>${esc(t.counterparty_name||'—')}</td>
+        <td>${esc(t.category||'—')}</td>
+        <td style="text-align:right" class="${t.txn_type==='income'?'amount-pos':'amount-neg'}">${t.txn_type==='income'?'+':'−'}${fmt(t.amount)}</td>
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="editTxn(${t.id})">✏</button>
+          ${t.status==='draft'
+            ? `<button class="btn btn-success btn-sm" onclick="confirmTxn(${t.id})">✓ Провести</button><button class="btn btn-danger btn-sm" onclick="deleteTxn(${t.id})">🗑 Удалить</button>`
+            : `<button class="btn btn-secondary btn-sm" onclick="cancelTxn(${t.id})">✕ Отменить</button>`}
+        </td>
+      </tr>`).join('')}</tbody></table>`;
   } catch(e){toast(e.message,'error');}
 }
 function filterTxn(type,btn){document.querySelectorAll('#page-finance .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadFinance(type);}
-async function deleteTxn(id){if(!confirm('Удалить операцию?'))return;await api('/transactions/'+id,'DELETE');toast('Удалено');loadFinance();}
+async function confirmTxn(id){if(!confirm('Провести операцию? Баланс счёта и контрагента будут обновлены.'))return;try{await api('/transactions/'+id+'/confirm','PUT');toast('Операция проведена');loadFinance();}catch(e){toast(e.message,'error');}}
+async function cancelTxn(id){if(!confirm('Отменить проведение операции? Статус вернётся к «не проведена».'))return;try{await api('/transactions/'+id+'/cancel','PUT');toast('Проведение отменено');loadFinance();}catch(e){toast(e.message,'error');}}
+async function deleteTxn(id){if(!confirm('Удалить операцию?'))return;try{await api('/transactions/'+id,'DELETE');toast('Удалено');loadFinance();}catch(e){toast(e.message,'error');}}
+
+function txnFormHtml(t={}, accounts=[], cps=[]) {
+  return `<div class="form-row"><div class="form-group"><label>Дата</label><input id="f-date" type="date" value="${t.txn_date||new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Тип *</label><select id="f-type"><option value="income"${t.txn_type==='income'?' selected':''}>Приход</option><option value="expense"${t.txn_type==='expense'?' selected':''}>Расход</option><option value="transfer"${t.txn_type==='transfer'?' selected':''}>Перевод</option></select></div></div><div class="form-group"><label>Счёт *</label><select id="f-acc"><option value="">— выберите —</option>${accounts.map(a=>`<option value="${a.id}"${a.id==t.account_id?' selected':''}>${esc(a.name)} (${fmt(a.balance)})</option>`).join('')}</select></div><div class="form-group"><label>Сумма *</label><input id="f-amount" type="number" value="${t.amount||''}" placeholder="0"></div><div class="form-group"><label>Описание *</label><input id="f-desc" value="${esc(t.description||'')}" placeholder="Оплата от клиента..."></div><div class="form-row"><div class="form-group"><label>Контрагент</label><select id="f-cp"><option value="">— необязательно —</option>${cps.map(c=>`<option value="${c.id}"${c.id==t.counterparty_id?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label>Категория</label><input id="f-cat" value="${esc(t.category||'')}" placeholder="Продажи, Закупки..."></div></div>`;
+}
+
 async function openAddTxn() {
   const [accounts,cps] = await Promise.all([api('/accounts/'),api('/counterparties/')]);
-  openModal('Новая операция',`<div class="form-row"><div class="form-group"><label>Дата</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Тип *</label><select id="f-type"><option value="income">Приход</option><option value="expense">Расход</option><option value="transfer">Перевод</option></select></div></div><div class="form-group"><label>Счёт *</label><select id="f-acc"><option value="">— выберите —</option>${accounts.map(a=>`<option value="${a.id}">${esc(a.name)} (${fmt(a.balance)})</option>`).join('')}</select></div><div class="form-group"><label>Сумма *</label><input id="f-amount" type="number" placeholder="0"></div><div class="form-group"><label>Описание *</label><input id="f-desc" placeholder="Оплата от клиента..."></div><div class="form-row"><div class="form-group"><label>Контрагент</label><select id="f-cp"><option value="">— необязательно —</option>${cps.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label>Категория</label><input id="f-cat" placeholder="Продажи, Закупки..."></div></div>`,
+  openModal('Новая операция', txnFormHtml({}, accounts, cps),
   async()=>{
     const data={txn_date:document.getElementById('f-date').value,txn_type:document.getElementById('f-type').value,account_id:+document.getElementById('f-acc').value,amount:+document.getElementById('f-amount').value,description:document.getElementById('f-desc').value,counterparty_id:+document.getElementById('f-cp').value||null,category:document.getElementById('f-cat').value||null};
     if(!data.account_id) throw new Error('Выберите счёт');
     if(!data.amount) throw new Error('Введите сумму');
     if(!data.description) throw new Error('Введите описание');
-    await api('/transactions/','POST',data); toast('Операция добавлена'); loadFinance();
+    await api('/transactions/','POST',data); toast('Операция создана (не проведена)'); loadFinance();
+  });
+}
+
+async function editTxn(id) {
+  const [t, accounts, cps] = await Promise.all([api('/transactions/'+id), api('/accounts/'), api('/counterparties/')]);
+  openModal('Редактировать операцию', txnFormHtml(t, accounts, cps),
+  async()=>{
+    const data={txn_date:document.getElementById('f-date').value,txn_type:document.getElementById('f-type').value,account_id:+document.getElementById('f-acc').value,amount:+document.getElementById('f-amount').value,description:document.getElementById('f-desc').value,counterparty_id:+document.getElementById('f-cp').value||null,category:document.getElementById('f-cat').value||null};
+    if(!data.account_id) throw new Error('Выберите счёт');
+    if(!data.amount) throw new Error('Введите сумму');
+    if(!data.description) throw new Error('Введите описание');
+    await api('/transactions/'+id,'PUT',data); toast('Операция обновлена'); loadFinance();
   });
 }
 

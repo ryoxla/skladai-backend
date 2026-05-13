@@ -168,8 +168,21 @@ class TransactionBase(BaseModel):
     description: str
 
 class TransactionCreate(TransactionBase): pass
+
+class TransactionUpdate(BaseModel):
+    txn_date: Optional[date] = None
+    txn_type: Optional[TxnTypeEnum] = None
+    account_id: Optional[int] = None
+    account_to_id: Optional[int] = None
+    amount: Optional[Decimal] = None
+    counterparty_id: Optional[int] = None
+    document_id: Optional[int] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+
 class TransactionOut(TransactionBase):
     id: int
+    status: str = "draft"
     created_at: datetime
     counterparty_name: Optional[str] = None
     account_name: Optional[str] = None
