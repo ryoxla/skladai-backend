@@ -57,7 +57,7 @@ def recalculate_counterparty_balance(db: Session, counterparty_id: int):
             ELSE 0
         END), 0) as txn_balance
         FROM transactions
-        WHERE counterparty_id = :cp_id
+        WHERE counterparty_id = :cp_id AND status = 'confirmed'
     """), {"cp_id": counterparty_id})
     txn_balance = result2.scalar() or Decimal("0")
 
