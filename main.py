@@ -6,7 +6,13 @@ from routers import settings as settings_router
 
 app = FastAPI(title="SkladAI API", version="1.0.0", redirect_slashes=False)
 
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://rainbow-toffee-28a412.netlify.app"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router,           prefix="/api/auth",           tags=["Auth"])
 app.include_router(products.router,       prefix="/api/products",       tags=["Tovary"])
