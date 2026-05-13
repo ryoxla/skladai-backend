@@ -153,6 +153,10 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
   <div class="topbar">
     <div class="page-title" id="page-title">ДАШБОРД</div>
     <div class="topbar-right">
+      <div style="display:flex;align-items:center;gap:6px">
+        <label for="bg-color-picker" style="font-size:11px;color:var(--text2);font-weight:600;cursor:pointer;white-space:nowrap;text-transform:uppercase;letter-spacing:.06em">Фон</label>
+        <input type="color" id="bg-color-picker" value="#080b12" title="Цвет фона" style="width:32px;height:28px;border:1px solid var(--border2);border-radius:6px;background:transparent;cursor:pointer;padding:2px">
+      </div>
       <button class="btn btn-ghost" onclick="recalculateStock()" id="recalc-btn" style="display:none">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Пересчитать остатки
       </button>
@@ -348,6 +352,7 @@ async function doLogin() {
     localStorage.setItem('skladai_user', JSON.stringify(data.user));
     hideLogin();
     updateUserInfo();
+    loadBgColor();
     loadDashboard();
   } catch(e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
 }
@@ -725,12 +730,40 @@ async function editUser(id) {
 }
 async function deleteUser(id){if(!confirm('Деактивировать пользователя?'))return;await api('/auth/users/'+id,'DELETE');toast('Деактивирован');loadUsers();}
 
+// BG COLOR
+async function loadBgColor() {
+  try {
+    const data = await api('/settings/bg-color');
+    if(data && data.color) {
+      applyBgColor(data.color);
+      document.getElementById('bg-color-picker').value = data.color;
+    }
+  } catch(e) {}
+}
+
+function applyBgColor(color) {
+  document.documentElement.style.setProperty('--bg', color);
+  document.getElementById('login-page').style.background = color;
+}
+
+document.getElementById('bg-color-picker').addEventListener('change', async function() {
+  const color = this.value;
+  applyBgColor(color);
+  try {
+    await api('/settings/bg-color', 'PUT', {color});
+    toast('Цвет фона сохранён');
+  } catch(e) {
+    toast('Ошибка сохранения: '+e.message, 'error');
+  }
+});
+
 // INIT
 const savedUser = localStorage.getItem('skladai_user');
 if(getToken() && savedUser) {
   currentUser = JSON.parse(savedUser);
   updateUserInfo();
   hideLogin();
+  loadBgColor();
   loadDashboard();
 } else {
   showLogin();
