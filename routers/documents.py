@@ -246,10 +246,16 @@ def cancel_document(
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(404, "Документ не найден")
-    if doc.status == "confirmed":
-        raise HTTPException(400, "Нельзя отменить проведённый документ")
-    doc.status = "cancelled"
-    return {"message": "Документ отменён", "id": doc_id}
+    if doc.status != "confirmed":
+        raise HTTPException(400, "Можно отменить только проведённый документ")
+    doc.status = "draft"
+    db.flush()
+
+    recalculate_stock(db)
+    if doc.counterparty_id:
+        recalculate_counterparty_balance(db, doc.counterparty_id)
+
+    return {"message": "Проведение документа отменено", "id": doc_id}
 
 
 @router.delete("/{doc_id}", response_model=MessageResponse)

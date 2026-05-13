@@ -589,7 +589,7 @@ async function loadDocs(doc_type=null) {
   try {
     allDocs = await api('/documents/'+(doc_type&&doc_type!=='all'?'?doc_type='+doc_type:''));
     const typeLabel={receipt:'Приходная',shipment:'Расходная',return_in:'Возврат от кл.',return_out:'Возврат пост.',transfer:'Перемещение',inventory:'Инвентаризация',writeoff:'Списание'};
-    const statusLabel={draft:'Черновик',confirmed:'Проведён',cancelled:'Отменён'};
+    const statusLabel={draft:'Не проведена',confirmed:'Проведена',cancelled:'Отменена'};
     document.getElementById('docs-table').innerHTML = !allDocs.length ? '<div class="empty">Документов нет</div>'
       : `<table><thead><tr><th>Номер</th><th>Тип</th><th>Дата</th><th>Контрагент</th><th>Склад</th><th style="text-align:right">Позиций</th><th style="text-align:right">Сумма</th><th>Статус</th><th></th></tr></thead><tbody>${allDocs.map(d=>`<tr>
         <td class="mono">${esc(d.doc_number)}</td>
@@ -602,7 +602,7 @@ async function loadDocs(doc_type=null) {
         <td><span class="badge ${d.status==='confirmed'?'badge-green':d.status==='cancelled'?'badge-red':'badge-gray'}">${statusLabel[d.status]||d.status}</span></td>
         <td style="display:flex;gap:4px">
           <button class="btn btn-ghost btn-sm" onclick="editDoc(${d.id})">✏</button>
-         ${d.status==='draft'?`<button class="btn btn-success btn-sm" onclick="confirmDoc(${d.id})">✓ Провести</button><button class="btn btn-secondary btn-sm" onclick="cancelDoc(${d.id})">✕ Отменить</button>`:d.status==='confirmed'?`<button class="btn btn-danger btn-sm" onclick="cancelDoc(${d.id})">✕ Отменить</button>`:d.status==='cancelled'?`<button class="btn btn-danger btn-sm" onclick="deleteDoc(${d.id})">🗑 Удалить</button>`:''}
+         ${d.status==='draft'?`<button class="btn btn-success btn-sm" onclick="confirmDoc(${d.id})">✓ Провести</button><button class="btn btn-danger btn-sm" onclick="deleteDoc(${d.id})">🗑 Удалить</button>`:d.status==='confirmed'?`<button class="btn btn-danger btn-sm" onclick="cancelDoc(${d.id})">✕ Отменить</button>`:d.status==='cancelled'?`<button class="btn btn-danger btn-sm" onclick="deleteDoc(${d.id})">🗑 Удалить</button>`:''}
         </td>
       </tr>`).join('')}</tbody></table>`;
   } catch(e){toast(e.message,'error');}
@@ -610,7 +610,7 @@ async function loadDocs(doc_type=null) {
 
 function filterDocs(type,btn){document.querySelectorAll('#page-documents .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadDocs(type);}
 async function confirmDoc(id){if(!confirm('Провести документ?'))return;await api('/documents/'+id+'/confirm','PUT');toast('Документ проведён');loadDocs();}
-async function cancelDoc(id){if(!confirm('Отменить документ?'))return;await api('/documents/'+id+'/cancel','PUT');toast('Документ отменён');loadDocs();}
+async function cancelDoc(id){if(!confirm('Отменить проведение документа?'))return;await api('/documents/'+id+'/cancel','PUT');toast('Проведение отменено, документ возвращён в статус "Не проведена"');loadDocs();}
 async function deleteDoc(id){if(!confirm('Удалить документ? Это действие необратимо.'))return;await api('/documents/'+id,'DELETE');toast('Документ удалён');loadDocs();}
 
 async function openAddDoc() {
