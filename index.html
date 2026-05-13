@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СкладAI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;500;600&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#080b12;--bg2:#0d1117;--bg3:#131a24;--border:#1e2d3d;--border2:#243447;--text:#c9d6e3;--text2:#6b8299;--accent:#00d4ff;--green:#00e676;--red:#ff4757;--yellow:#ffd32a;--purple:#7c5cbf;--card:#0d1520}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Manrope',sans-serif;background:var(--bg);color:var(--text);display:flex;height:100vh}
+.sidebar{width:220px;min-width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.logo-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--accent);line-height:1}
+.logo-sub{font-size:10px;color:var(--text2);letter-spacing:3px;text-transform:uppercase;margin-top:2px}
+.nav{flex:1;padding:16px 0;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;font-size:13px;font-weight:500;color:var(--text2);transition:all .15s;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text);background:rgba(0,212,255,.04)}
+.nav-item.active{color:var(--accent);background:rgba(0,212,255,.07);border-left-color:var(--accent)}
+.nav-item svg{width:16px;height:16px;flex-shrink:0}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px}
+.sidebar-bottom{padding:16px 20px;border-top:1px solid var(--border)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+.status-text{font-size:11px;color:var(--text2)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 28px;background:var(--bg2);flex-shrink:0}
+.page-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:var(--text)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.btn{border:none;cursor:pointer;font-family:'Manrope',sans-serif;font-weight:600;font-size:12px;border-radius:6px;transition:all .15s;display:inline-flex;align-items:center;gap:6px;padding:8px 16px}
+.btn-primary{background:var(--accent);color:#000}.btn-primary:hover{background:#00bbdd}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:rgba(255,71,87,.12);border:1px solid rgba(255,71,87,.3);color:var(--red)}.btn-danger:hover{background:rgba(255,71,87,.2)}
+.btn-success{background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green)}
+.btn-secondary{background:rgba(107,130,153,.12);border:1px solid rgba(107,130,153,.3);color:var(--text2)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.content{flex:1;overflow-y:auto;padding:24px 28px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-card.blue::before{background:linear-gradient(90deg,var(--accent),transparent)}
+.kpi-card.green::before{background:linear-gradient(90deg,var(--green),transparent)}
+.kpi-card.red::before{background:linear-gradient(90deg,var(--red),transparent)}
+.kpi-card.purple::before{background:linear-gradient(90deg,var(--purple),transparent)}
+.kpi-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:10px}
+.kpi-value{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:600;color:var(--text);margin-bottom:4px}
+.kpi-sub{font-size:11px;color:var(--text2)}
+.kpi-icon{position:absolute;right:16px;top:16px;opacity:.15;font-size:32px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:10px 16px;font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:11px 16px;font-size:13px;border-bottom:1px solid rgba(30,45,61,.6)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,212,255,.025)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.badge-green{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.badge-red{background:rgba(255,71,87,.12);color:var(--red);border:1px solid rgba(255,71,87,.2)}
+.badge-yellow{background:rgba(255,211,42,.12);color:var(--yellow);border:1px solid rgba(255,211,42,.2)}
+.badge-blue{background:rgba(0,212,255,.1);color:var(--accent);border:1px solid rgba(0,212,255,.2)}
+.badge-gray{background:rgba(107,130,153,.1);color:var(--text2);border:1px solid var(--border)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:28px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal-wide{width:780px}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:24px;color:var(--accent)}
+.form-group{margin-bottom:16px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label{display:block;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+input,select,textarea{width:100%;background:var(--bg2);border:1px solid var(--border2);color:var(--text);border-radius:6px;padding:9px 12px;font-family:'Manrope',sans-serif;font-size:13px;outline:none;transition:border .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b8299' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:30px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:24px}
+.items-table{width:100%;border-collapse:collapse;margin-top:8px}
+.items-table th{padding:6px 8px;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border2);text-align:left}
+.items-table td{padding:4px 4px}
+.items-table input,.items-table select{padding:6px 8px;font-size:12px}
+.items-total{display:flex;justify-content:flex-end;padding:10px 0 0;font-size:13px;font-weight:600;color:var(--accent);font-family:'JetBrains Mono',monospace}
+.toast-container{position:fixed;top:20px;right:20px;z-index:2000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 18px;border-radius:8px;font-size:13px;font-weight:500;animation:slideIn .25s ease;border:1px solid}
+.toast-success{background:rgba(0,230,118,.1);border-color:rgba(0,230,118,.3);color:var(--green)}
+.toast-error{background:rgba(255,71,87,.1);border-color:rgba(255,71,87,.3);color:var(--red)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+.search-bar{position:relative}.search-bar input{padding-left:34px;width:220px}
+.search-bar svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2)}
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text2);font-size:13px;gap:10px}
+.spinner{width:18px;height:18px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:60px;color:var(--text2);font-size:13px}
+.filters{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.filter-btn{background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:'Manrope',sans-serif;font-size:12px;font-weight:600;padding:5px 12px;border-radius:5px;cursor:pointer;transition:all .15s}
+.filter-btn:hover,.filter-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,212,255,.06)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.amount-pos{color:var(--green);font-family:'JetBrains Mono',monospace;font-weight:600}
+.amount-neg{color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:600}
+.amount-neu{color:var(--text2);font-family:'JetBrains Mono',monospace}
+.page{display:none}.page.active{display:block}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-page" style="position:fixed;inset:0;background:#080b12;z-index:9999;display:flex;align-items:center;justify-content:center">
+  <div style="background:#0d1117;border:1px solid #1e2d3d;border-radius:16px;padding:40px;width:380px">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;color:#00d4ff;text-align:center;margin-bottom:8px">СкладAI</div>
+    <div style="text-align:center;color:#6b8299;font-size:12px;margin-bottom:32px;text-transform:uppercase;letter-spacing:3px">Система управления складом</div>
+    <div id="login-error" style="display:none;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);color:#ff4757;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
+    <div style="margin-bottom:16px"><label style="display:block;font-size:11px;font-weight:700;color:#6b8299;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Логин</label>
+    <input id="login-username" style="width:100%;background:#131a24;border:1px solid #243447;color:#c9d6e3;border-radius:8px;padding:10px 14px;font-family:'Manrope',sans-serif;font-size:14px;outline:none" placeholder="admin"></div>
+    <div style="margin-bottom:24px"><label style="display:block;font-size:11px;font-weight:700;color:#6b8299;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Пароль</label>
+    <input id="login-password" type="password" style="width:100%;background:#131a24;border:1px solid #243447;color:#c9d6e3;border-radius:8px;padding:10px 14px;font-family:'Manrope',sans-serif;font-size:14px;outline:none" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button onclick="doLogin()" style="width:100%;background:#00d4ff;color:#000;border:none;border-radius:8px;padding:12px;font-family:'Manrope',sans-serif;font-weight:700;font-size:14px;cursor:pointer">Войти</button>
+  </div>
+</div>
+
+<aside class="sidebar">
+  <div class="logo"><div class="logo-title">СкладAI</div><div class="logo-sub">Управление складом</div></div>
+  <nav class="nav">
+    <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Дашборд
+    </div>
+    <div class="nav-item" onclick="showPage('products',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Товары
+      <span class="nav-badge" id="badge-low" style="display:none">!</span>
+    </div>
+    <div class="nav-item" onclick="showPage('stock',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Остатки
+    </div>
+    <div class="nav-item" onclick="showPage('counterparties',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Контрагенты
+    </div>
+    <div class="nav-item" onclick="showPage('documents',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Накладные
+    </div>
+    <div class="nav-item" onclick="showPage('finance',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Финансы
+    </div>
+    <div class="nav-item" onclick="showPage('accounts',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Счета и кассы
+    </div>
+    <div class="nav-item" id="nav-users" onclick="showPage('users',this)" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Пользователи
+    </div>
+  </nav>
+  <div class="sidebar-bottom"><span class="status-dot"></span><span class="status-text" id="status-text">Загрузка...</span></div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="page-title" id="page-title">ДАШБОРД</div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" onclick="recalculateStock()" id="recalc-btn" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Пересчитать остатки
+      </button>
+      <button class="btn btn-ghost" onclick="refreshCurrentPage()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Обновить
+      </button>
+      <button class="btn btn-primary" id="add-btn" onclick="openAddModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить
+      </button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="page active" id="page-dashboard">
+      <div class="kpi-grid" id="kpi-grid"><div class="loading"><div class="spinner"></div> Загрузка...</div></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-header"><span class="card-title">⚠ Критические остатки</span></div><div id="alerts-table"><div class="loading"><div class="spinner"></div></div></div></div>
+        <div class="card"><div class="card-header"><span class="card-title">💰 Крупные должники</span></div><div id="debtors-table"><div class="loading"><div class="spinner"></div></div></div></div>
+      </div>
+    </div>
+    <div class="page" id="page-products">
+      <div class="card">
+        <div class="filters"><div class="search-bar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Поиск товара..." oninput="filterProducts(this.value)"></div></div>
+        <div id="products-table"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <div class="page" id="page-stock">
+      <div class="card">
+        <div class="filters">
+          <button class="filter-btn active" onclick="filterStock('all',this)">Все</button>
+          <button class="filter-btn" onclick="filterStock('low_stock',this)">Мало</button>
+          <button class="filter-btn" onclick="filterStock('out_of_stock',this)">Нет на складе</button>
+          <button class="filter-btn" onclick="filterStock('ok',this)">В норме</button>
+        </div>
+        <div id="stock-table"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <div class="page" id="page-counterparties">
+      <div class="card">
+        <div class="filters">
+          <button class="filter-btn active" onclick="filterCP('all',this)">Все</button>
+          <button class="filter-btn" onclick="filterCP('client',this)">Клиенты</button>
+          <button class="filter-btn" onclick="filterCP('supplier',this)">Поставщики</button>
+          <button class="filter-btn" onclick="filterCP('debt',this)">С долгом</button>
+        </div>
+        <div id="cp-table"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <div class="page" id="page-documents">
+      <div class="card">
+        <div class="filters">
+          <button class="filter-btn active" onclick="filterDocs('all',this)">Все</button>
+          <button class="filter-btn" onclick="filterDocs('receipt',this)">Приходные</button>
+          <button class="filter-btn" onclick="filterDocs('shipment',this)">Расходные</button>
+          <button class="filter-btn" onclick="filterDocs('return_in',this)">Возвраты</button>
+        </div>
+        <div id="docs-table"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <div class="page" id="page-finance">
+      <div class="card">
+        <div class="filters">
+          <button class="filter-btn active" onclick="filterTxn('all',this)">Все</button>
+          <button class="filter-btn" onclick="filterTxn('income',this)">Приходы</button>
+          <button class="filter-btn" onclick="filterTxn('expense',this)">Расходы</button>
+          <button class="filter-btn" onclick="filterTxn('transfer',this)">Переводы</button>
+        </div>
+        <div id="finance-table"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+    <div class="page" id="page-accounts"><div id="accounts-list"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="page" id="page-users"><div id="users-list"><div class="loading"><div class="spinner"></div></div></div></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal-box">
+    <div class="modal-title" id="modal-title">Добавить</div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Отмена</button>
+      <button class="btn btn-primary" onclick="saveModal()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://skladai-backend-production.up.railway.app/api';
+let currentPage = 'dashboard';
+let allProducts = [], allCP = [], allDocs = [], allTxns = [], allStock = [];
+let modalSaveFn = null;
+let currentUser = null;
+let docProducts = [];
+let docItems = [];
+
+const fmt = n => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(n||0);
+const fmtDate = d => d ? new Date(d).toLocaleDateString('ru-RU') : '—';
+const esc = s => String(s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function getToken() { return localStorage.getItem('skladai_token'); }
+function setToken(t) { localStorage.setItem('skladai_token', t); }
+function clearToken() { localStorage.removeItem('skladai_token'); localStorage.removeItem('skladai_user'); }
+
+async function api(path, method='GET', body=null) {
+  const opts = {method, headers:{'Content-Type':'application/json'}};
+  const token = getToken();
+  if(token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if(body) opts.body = JSON.stringify(body);
+  const r = await fetch(API+path, opts);
+  if(r.status === 401) { clearToken(); showLogin(); return; }
+  if(!r.ok) { const err = await r.json().catch(()=>({detail:'Ошибка сервера'})); throw new Error(err.detail||JSON.stringify(err)); }
+  return r.json();
+}
+
+function toast(msg, type='success') {
+  const el = document.createElement('div');
+  el.className = 'toast toast-'+type;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+
+function showPage(name, el) {
+  document.getElementById('recalc-btn').style.display = (name==='stock'||name==='documents'||name==='products') ? '' : 'none';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(el) el.classList.add('active');
+  currentPage = name;
+  const titles = {dashboard:'Дашборд',products:'Товары',stock:'Остатки на складе',counterparties:'Контрагенты',documents:'Накладные',finance:'Финансы',accounts:'Счета и кассы',users:'Пользователи'};
+  document.getElementById('page-title').textContent = titles[name]||name;
+  document.getElementById('add-btn').style.display = (name==='dashboard'||name==='stock') ? 'none' : '';
+  loadPage(name);
+}
+
+function refreshCurrentPage() { loadPage(currentPage); }
+
+function loadPage(name) {
+  if(name==='dashboard') loadDashboard();
+  else if(name==='products') loadProducts();
+  else if(name==='stock') loadStock();
+  else if(name==='counterparties') loadCP();
+  else if(name==='documents') loadDocs();
+  else if(name==='finance') loadFinance();
+  else if(name==='accounts') loadAccounts();
+  else if(name==='users') loadUsers();
+}
+
+function openAddModal() {
+  const fns = {products:openAddProduct,counterparties:openAddCP,documents:openAddDoc,finance:openAddTxn,accounts:openAddAccount,users:openAddUser};
+  if(fns[currentPage]) fns[currentPage]();
+}
+
+function openModal(title, bodyHTML, saveFn, wide=false) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHTML;
+  document.getElementById('modal-box').className = 'modal'+(wide?' modal-wide':'');
+  modalSaveFn = saveFn;
+  document.getElementById('modal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('modal').style.display = 'none'; modalSaveFn = null; }
+async function saveModal() {
+  if(!modalSaveFn) return;
+  try { await modalSaveFn(); closeModal(); }
+  catch(e) { toast(e.message,'error'); }
+}
+
+// AUTH
+function showLogin() {
+  document.getElementById('login-page').style.display = 'flex';
+  document.querySelector('.sidebar').style.display = 'none';
+  document.querySelector('.main').style.display = 'none';
+}
+function hideLogin() {
+  document.getElementById('login-page').style.display = 'none';
+  document.querySelector('.sidebar').style.display = 'flex';
+  document.querySelector('.main').style.display = 'flex';
+}
+async function doLogin() {
+  const username = document.getElementById('login-username').value;
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.style.display = 'none';
+  try {
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+    const r = await fetch(API+'/auth/login', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:formData});
+    const data = await r.json();
+    if(!r.ok) throw new Error(data.detail||'Ошибка входа');
+    setToken(data.access_token);
+    currentUser = data.user;
+    localStorage.setItem('skladai_user', JSON.stringify(data.user));
+    hideLogin();
+    updateUserInfo();
+    loadDashboard();
+  } catch(e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+}
+function logout() { clearToken(); currentUser = null; showLogin(); }
+function updateUserInfo() {
+  if(!currentUser) return;
+  const roleNames = {admin:'Администратор',manager:'Менеджер',warehouse:'Кладовщик',accountant:'Бухгалтер',viewer:'Просмотр'};
+  document.getElementById('status-text').innerHTML = `${esc(currentUser.full_name||currentUser.username)} · ${roleNames[currentUser.role]||currentUser.role} <a href="#" onclick="logout()" style="color:#ff4757;margin-left:8px;text-decoration:none">Выйти</a>`;
+  if(currentUser.role === 'admin') document.getElementById('nav-users').style.display = 'flex';
+}
+
+// DASHBOARD
+async function loadDashboard() {
+  try {
+    const [accounts, stockAlerts, cpBalances, stockVal] = await Promise.all([
+      api('/accounts/'), api('/stock/alerts'), api('/counterparties/balances'), api('/stock/value')
+    ]);
+    const cash = accounts.reduce((s,a)=>s+parseFloat(a.balance||0),0);
+    const debt = cpBalances.filter(c=>c.balance<0&&c.type==='client').reduce((s,c)=>s+Math.abs(c.balance),0);
+    document.getElementById('kpi-grid').innerHTML = `
+      <div class="kpi-card blue"><div class="kpi-icon">💵</div><div class="kpi-label">Касса / Счета</div><div class="kpi-value">${fmt(cash)}</div><div class="kpi-sub">${accounts.length} счёт(ов)</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">📦</div><div class="kpi-label">Стоимость склада</div><div class="kpi-value">${fmt(stockVal.value_sell)}</div><div class="kpi-sub">${stockVal.products_count} позиций</div></div>
+      <div class="kpi-card red"><div class="kpi-icon">👥</div><div class="kpi-label">Дебиторский долг</div><div class="kpi-value">${fmt(debt)}</div><div class="kpi-sub">${cpBalances.filter(c=>c.balance<0&&c.type==='client').length} клиентов</div></div>
+      <div class="kpi-card purple"><div class="kpi-icon">⚠</div><div class="kpi-label">Критических остатков</div><div class="kpi-value">${stockAlerts.length}</div><div class="kpi-sub">позиций</div></div>`;
+    if(stockAlerts.length>0){document.getElementById('badge-low').style.display='';document.getElementById('badge-low').textContent=stockAlerts.length;}
+    document.getElementById('alerts-table').innerHTML = stockAlerts.length===0 ? '<div class="empty">✅ Все остатки в норме</div>'
+      : `<table><thead><tr><th>Товар</th><th>Склад</th><th>Остаток</th><th>Минимум</th></tr></thead><tbody>${stockAlerts.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.warehouse)}</td><td><span class="badge ${s.alert_level==='out_of_stock'?'badge-red':'badge-yellow'}">${s.qty} ${esc(s.unit)}</span></td><td class="mono">${s.min_qty}</td></tr>`).join('')}</tbody></table>`;
+    const debtors = cpBalances.filter(c=>c.balance<0).sort((a,b)=>a.balance-b.balance).slice(0,6);
+    document.getElementById('debtors-table').innerHTML = debtors.length===0 ? '<div class="empty">✅ Задолженностей нет</div>'
+      : `<table><thead><tr><th>Контрагент</th><th>Тип</th><th style="text-align:right">Долг</th></tr></thead><tbody>${debtors.map(c=>`<tr><td>${esc(c.name)}</td><td><span class="badge ${c.type==='client'?'badge-blue':'badge-yellow'}">${c.type==='client'?'Клиент':'Поставщик'}</span></td><td style="text-align:right" class="amount-neg">${fmt(Math.abs(c.balance))}</td></tr>`).join('')}</tbody></table>`;
+  } catch(e) { toast('Ошибка дашборда: '+e.message,'error'); }
+}
+
+// PRODUCTS
+async function loadProducts() {
+  document.getElementById('products-table').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try { allProducts = await api('/products/'); renderProducts(allProducts); }
+  catch(e) { toast(e.message,'error'); }
+}
+function renderProducts(list) {
+  if(!list.length){document.getElementById('products-table').innerHTML='<div class="empty">Товаров нет</div>';return;}
+  document.getElementById('products-table').innerHTML = `<table>
+    <thead><tr><th>Артикул</th><th>Наименование</th><th>Сорт</th><th>Страна</th><th>Ед.</th><th style="text-align:center">Остаток</th><th>Статус</th><th></th></tr></thead>
+    <tbody>${list.map(p=>`<tr>
+      <td class="mono">${esc(p.sku)}</td>
+      <td><strong>${esc(p.name)}</strong></td>
+      <td>${esc(p.sort||'—')}</td>
+      <td>${esc(p.country||'—')}</td>
+      <td class="mono">${esc(p.unit_name||'')}</td>
+      <td style="text-align:center"><span class="badge ${p.alert==='out_of_stock'?'badge-red':p.alert==='low_stock'?'badge-yellow':'badge-green'}">${p.qty||0}</span></td>
+      <td><span class="badge ${p.alert==='out_of_stock'?'badge-red':p.alert==='low_stock'?'badge-yellow':'badge-green'}">${p.alert==='out_of_stock'?'Нет':p.alert==='low_stock'?'Мало':'Норма'}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="editProduct(${p.id})">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">✕</button></td>
+    </tr>`).join('')}</tbody></table>`;
+}
+function filterProducts(q){renderProducts(allProducts.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.sku.toLowerCase().includes(q.toLowerCase())));}
+
+function productForm(p={}, units=[]) {
+  return `
+    <div class="form-row">
+      <div class="form-group"><label>Наименование *</label><input id="f-name" value="${esc(p.name||'')}" placeholder="Яблоки"></div>
+      <div class="form-group"><label>Артикул *</label><input id="f-sku" value="${esc(p.sku||'')}" placeholder="YBL-001"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Сорт</label><input id="f-sort" value="${esc(p.sort||'')}" placeholder="Гренни Смит"></div>
+      <div class="form-group"><label>Страна</label><input id="f-country" value="${esc(p.country||'')}" placeholder="Польша"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Единица измерения *</label><select id="f-unit">${units.map(u=>`<option value="${u.id}"${u.id===p.unit_id?' selected':''}>${u.name} (${u.short_name})</option>`).join('')}</select></div>
+      <div class="form-group"><label>Минимальный остаток</label><input id="f-minqty" type="number" value="${p.min_qty||0}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>НДС %</label><input id="f-vat" type="number" value="${p.vat_rate||20}"></div>
+      <div class="form-group"><label>Описание</label><input id="f-desc" value="${esc(p.description||'')}" placeholder="Необязательно"></div>
+    </div>`;
+}
+
+function getProductData() {
+  return {
+    name: document.getElementById('f-name').value,
+    sku: document.getElementById('f-sku').value,
+    sort: document.getElementById('f-sort').value||null,
+    country: document.getElementById('f-country').value||null,
+    unit_id: +document.getElementById('f-unit').value,
+    min_qty: +document.getElementById('f-minqty').value||0,
+    vat_rate: +document.getElementById('f-vat').value||20,
+    description: document.getElementById('f-desc').value||null
+  };
+}
+
+async function openAddProduct() {
+  const units = await api('/units/');
+  openModal('Новый товар', productForm({}, units), async()=>{
+    const data = getProductData();
+    if(!data.name||!data.sku) throw new Error('Заполните название и артикул');
+    await api('/products/','POST',data); toast('Товар добавлен'); loadProducts();
+  });
+}
+
+async function editProduct(id) {
+  const [p,units] = await Promise.all([api('/products/'+id),api('/units/')]);
+  openModal('Редактировать товар', productForm(p, units), async()=>{
+    const data = getProductData();
+    await api('/products/'+id,'PUT',data); toast('Товар обновлён'); loadProducts();
+  });
+}
+
+async function deleteProduct(id){if(!confirm('Деактивировать товар?'))return;await api('/products/'+id,'DELETE');toast('Деактивирован');loadProducts();}
+
+// STOCK
+async function loadStock(alert_level=null) {
+  document.getElementById('stock-table').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    allStock = await api('/stock/'+(alert_level&&alert_level!=='all'?'?alert_level='+alert_level:''));
+    document.getElementById('stock-table').innerHTML = !allStock.length ? '<div class="empty">Остатков нет</div>'
+      : `<table><thead><tr><th>Товар</th><th>Склад</th><th>Ед.</th><th style="text-align:center">Остаток</th><th>Минимум</th><th>Статус</th></tr></thead><tbody>${allStock.map(s=>`<tr><td><strong>${esc(s.name)}</strong></td><td>${esc(s.warehouse)}</td><td class="mono">${esc(s.unit)}</td><td style="text-align:center"><strong class="${s.alert_level==='out_of_stock'?'amount-neg':s.alert_level==='low_stock'?'':'amount-pos'}">${s.qty}</strong></td><td class="mono">${s.min_qty}</td><td><span class="badge ${s.alert_level==='out_of_stock'?'badge-red':s.alert_level==='low_stock'?'badge-yellow':'badge-green'}">${s.alert_level==='out_of_stock'?'Нет':s.alert_level==='low_stock'?'Мало':'В норме'}</span></td></tr>`).join('')}</tbody></table>`;
+  } catch(e){toast(e.message,'error');}
+}
+function filterStock(level,btn){document.querySelectorAll('#page-stock .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadStock(level);}
+async function recalculateStock() {
+  if(!confirm('Пересчитать остатки по всем проведённым накладным?')) return;
+  try { await api('/stock/recalculate','POST'); toast('Остатки пересчитаны'); loadPage(currentPage); }
+  catch(e) { toast(e.message,'error'); }
+}
+
+// COUNTERPARTIES
+async function loadCP(type=null,debtOnly=false) {
+  document.getElementById('cp-table').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    let url='/counterparties/';
+    if(type) url+='?type='+type;
+    if(debtOnly) url+=(type?'&':'?')+'has_debt=true';
+    allCP = await api(url);
+    document.getElementById('cp-table').innerHTML = !allCP.length ? '<div class="empty">Контрагентов нет</div>'
+      : `<table><thead><tr><th>Наименование</th><th>Тип</th><th>ИНН</th><th>Телефон</th><th style="text-align:right">Баланс</th><th>Статус</th><th></th></tr></thead><tbody>${allCP.map(c=>`<tr><td><strong>${esc(c.name)}</strong></td><td><span class="badge ${c.type==='client'?'badge-blue':'badge-yellow'}">${c.type==='client'?'Клиент':c.type==='supplier'?'Поставщик':'Оба'}</span></td><td class="mono">${esc(c.inn||'—')}</td><td class="mono">${esc(c.phone||'—')}</td><td style="text-align:right" class="${c.balance<0?'amount-neg':c.balance>0?'amount-pos':'amount-neu'}">${c.balance>0?'+':''}${fmt(c.balance)}</td><td><span class="badge ${c.balance<0?'badge-red':c.balance>0?'badge-green':'badge-gray'}">${c.balance<0?'Долг':c.balance>0?'Переплата':'Закрыт'}</span></td><td><button class="btn btn-ghost btn-sm" onclick="editCP(${c.id})">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteCP(${c.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
+  } catch(e){toast(e.message,'error');}
+}
+function filterCP(type,btn){document.querySelectorAll('#page-counterparties .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(type==='debt')loadCP(null,true);else loadCP(type==='all'?null:type);}
+function cpForm(c={}){return `<div class="form-group"><label>Наименование *</label><input id="f-name" value="${esc(c.name||'')}"></div><div class="form-row"><div class="form-group"><label>Тип *</label><select id="f-type"><option value="client"${c.type==='client'?' selected':''}>Клиент</option><option value="supplier"${c.type==='supplier'?' selected':''}>Поставщик</option><option value="both"${c.type==='both'?' selected':''}>Оба</option></select></div><div class="form-group"><label>Правовая форма</label><select id="f-legal"><option value="">—</option><option value="ooo"${c.legal_type==='ooo'?' selected':''}>ООО</option><option value="ip"${c.legal_type==='ip'?' selected':''}>ИП</option><option value="ao"${c.legal_type==='ao'?' selected':''}>АО</option><option value="fiz"${c.legal_type==='fiz'?' selected':''}>Физ. лицо</option></select></div></div><div class="form-row"><div class="form-group"><label>ИНН</label><input id="f-inn" value="${esc(c.inn||'')}"></div><div class="form-group"><label>КПП</label><input id="f-kpp" value="${esc(c.kpp||'')}"></div></div><div class="form-row"><div class="form-group"><label>Телефон</label><input id="f-phone" value="${esc(c.phone||'')}"></div><div class="form-group"><label>Email</label><input id="f-email" value="${esc(c.email||'')}"></div></div><div class="form-group"><label>Контактное лицо</label><input id="f-contact" value="${esc(c.contact_name||'')}"></div><div class="form-group"><label>Адрес</label><input id="f-addr" value="${esc(c.address||'')}"></div><div class="form-row"><div class="form-group"><label>Лимит кредита</label><input id="f-credit" type="number" value="${c.credit_limit||0}"></div><div class="form-group"><label>Баланс</label><input id="f-balance" type="number" value="${c.balance||0}"></div></div>`;}
+function cpData(){return{name:document.getElementById('f-name').value,type:document.getElementById('f-type').value,legal_type:document.getElementById('f-legal').value||null,inn:document.getElementById('f-inn').value||null,kpp:document.getElementById('f-kpp').value||null,phone:document.getElementById('f-phone').value||null,email:document.getElementById('f-email').value||null,contact_name:document.getElementById('f-contact').value||null,address:document.getElementById('f-addr').value||null,credit_limit:+document.getElementById('f-credit').value||0,balance:+document.getElementById('f-balance').value||0};}
+function openAddCP(){openModal('Новый контрагент',cpForm(),async()=>{const d=cpData();if(!d.name)throw new Error('Введите название');await api('/counterparties/','POST',d);toast('Контрагент добавлен');loadCP();});}
+async function editCP(id){const c=await api('/counterparties/'+id);openModal('Редактировать контрагента',cpForm(c),async()=>{await api('/counterparties/'+id,'PUT',cpData());toast('Обновлено');loadCP();});}
+async function deleteCP(id){if(!confirm('Деактивировать?'))return;await api('/counterparties/'+id,'DELETE');toast('Деактивирован');loadCP();}
+
+// DOCUMENTS
+function docItemsOptions() {
+  return docProducts.map(p=>`<option value="${p.id}" data-buy="0" data-sell="0">${esc(p.name)} (${p.sku}) — ${p.qty||0} на складе</option>`).join('');
+}
+
+function renderDocItems() {
+  const tbody = document.getElementById('doc-items-body');
+  if(!tbody) return;
+  tbody.innerHTML = docItems.map((item,i)=>{
+    const opts = docProducts.map(p=>`<option value="${p.id}"${p.id===item.product_id?' selected':''}>${esc(p.name)} (${p.sku}) — ${p.qty||0} на складе</option>`).join('');
+    return `<tr>
+      <td><select onchange="onItemProdChange(${i},this)">${opts}</select></td>
+      <td><input type="number" value="${item.qty}" min="0.001" step="0.001" oninput="onItemQtyPrice(${i},this,'qty')" style="width:80px"></td>
+      <td><input type="number" value="${item.price}" min="0" step="0.01" oninput="onItemQtyPrice(${i},this,'price')" style="width:100px"></td>
+      <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap" id="item-sum-${i}">${fmt(item.qty*item.price)}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="removeDocItem(${i})">✕</button></td>
+    </tr>`;
+  }).join('');
+  updateDocTotal();
+}
+
+function onItemProdChange(i, sel) {
+  docItems[i].product_id = +sel.value;
+  updateDocTotal();
+}
+
+function onItemQtyPrice(i, el, field) {
+  docItems[i][field] = +el.value || 0;
+  const sumEl = document.getElementById('item-sum-'+i);
+  if(sumEl) sumEl.textContent = fmt(docItems[i].qty * docItems[i].price);
+  updateDocTotal();
+}
+
+function removeDocItem(i) { docItems.splice(i,1); renderDocItems(); }
+
+function addDocItem() {
+  if(!docProducts.length) return;
+  docItems.push({product_id: docProducts[0].id, qty:1, price:0, vat_rate:20});
+  renderDocItems();
+}
+
+function updateDocTotal() {
+  const total = docItems.reduce((s,i)=>s+(i.qty*i.price),0);
+  const el = document.getElementById('doc-total');
+  if(el) el.textContent = 'Итого: ' + fmt(total);
+}
+
+function getDocItemsFromForm() {
+  return docItems.filter(i=>i.product_id&&i.qty>0).map(i=>({
+    product_id: i.product_id, qty: i.qty, price: i.price, vat_rate: i.vat_rate||20
+  }));
+}
+
+function docFormHeader(cps, warehouses, num='', type='receipt', date='', cp='', wh='', notes='') {
+  return `
+    <div class="form-row">
+      <div class="form-group"><label>Номер *</label><input id="f-num" value="${esc(num)}" placeholder="РН-0001"></div>
+      <div class="form-group"><label>Тип *</label><select id="f-type">
+        <option value="receipt"${type==='receipt'?' selected':''}>Приходная</option>
+        <option value="shipment"${type==='shipment'?' selected':''}>Расходная</option>
+        <option value="return_in"${type==='return_in'?' selected':''}>Возврат от клиента</option>
+        <option value="return_out"${type==='return_out'?' selected':''}>Возврат поставщику</option>
+        <option value="writeoff"${type==='writeoff'?' selected':''}>Списание</option>
+      </select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Дата</label><input id="f-date" type="date" value="${date||new Date().toISOString().slice(0,10)}"></div>
+      <div class="form-group"><label>Контрагент</label><select id="f-cp">
+        <option value="">— выберите —</option>${cps.map(c=>`<option value="${c.id}"${c.id==cp?' selected':''}>${esc(c.name)}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="form-group"><label>Склад</label><select id="f-wh">
+      <option value="">— выберите —</option>${warehouses.map(w=>`<option value="${w.id}"${w.id==wh?' selected':''}>${esc(w.name)}</option>`).join('')}
+    </select></div>
+    <div class="form-group"><label>Примечание</label><input id="f-notes" value="${esc(notes)}" placeholder="Необязательно"></div>
+    <div class="form-group">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label style="margin:0">Позиции товаров</label>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addDocItem()">+ Добавить товар</button>
+      </div>
+      <table class="items-table">
+        <thead><tr><th style="min-width:200px">Товар</th><th>Кол-во</th><th>Цена</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
+        <tbody id="doc-items-body"></tbody>
+      </table>
+      <div class="items-total" id="doc-total">Итого: ${fmt(0)}</div>
+    </div>`;
+}
+
+async function loadDocs(doc_type=null) {
+  document.getElementById('docs-table').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    allDocs = await api('/documents/'+(doc_type&&doc_type!=='all'?'?doc_type='+doc_type:''));
+    const typeLabel={receipt:'Приходная',shipment:'Расходная',return_in:'Возврат от кл.',return_out:'Возврат пост.',transfer:'Перемещение',inventory:'Инвентаризация',writeoff:'Списание'};
+    const statusLabel={draft:'Черновик',confirmed:'Проведён',cancelled:'Отменён'};
+    document.getElementById('docs-table').innerHTML = !allDocs.length ? '<div class="empty">Документов нет</div>'
+      : `<table><thead><tr><th>Номер</th><th>Тип</th><th>Дата</th><th>Контрагент</th><th>Склад</th><th style="text-align:right">Позиций</th><th style="text-align:right">Сумма</th><th>Статус</th><th></th></tr></thead><tbody>${allDocs.map(d=>`<tr>
+        <td class="mono">${esc(d.doc_number)}</td>
+        <td><span class="badge badge-blue">${typeLabel[d.doc_type]||d.doc_type}</span></td>
+        <td class="mono">${fmtDate(d.doc_date)}</td>
+        <td>${esc(d.counterparty_name||'—')}</td>
+        <td>${esc(d.warehouse_name||'—')}</td>
+        <td style="text-align:right" class="mono">${d.items?d.items.length:0}</td>
+        <td style="text-align:right" class="mono">${fmt(d.total_amount)}</td>
+        <td><span class="badge ${d.status==='confirmed'?'badge-green':d.status==='cancelled'?'badge-red':'badge-gray'}">${statusLabel[d.status]||d.status}</span></td>
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="editDoc(${d.id})">✏</button>
+         ${d.status==='draft'?`<button class="btn btn-success btn-sm" onclick="confirmDoc(${d.id})">✓ Провести</button><button class="btn btn-secondary btn-sm" onclick="cancelDoc(${d.id})">✕ Отменить</button>`:d.status==='confirmed'?`<button class="btn btn-danger btn-sm" onclick="cancelDoc(${d.id})">✕ Отменить</button>`:d.status==='cancelled'?`<button class="btn btn-danger btn-sm" onclick="deleteDoc(${d.id})">🗑 Удалить</button>`:''}
+        </td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch(e){toast(e.message,'error');}
+}
+
+function filterDocs(type,btn){document.querySelectorAll('#page-documents .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadDocs(type);}
+async function confirmDoc(id){if(!confirm('Провести документ?'))return;await api('/documents/'+id+'/confirm','PUT');toast('Документ проведён');loadDocs();}
+async function cancelDoc(id){if(!confirm('Отменить документ?'))return;await api('/documents/'+id+'/cancel','PUT');toast('Документ отменён');loadDocs();}
+async function deleteDoc(id){if(!confirm('Удалить документ? Это действие необратимо.'))return;await api('/documents/'+id,'DELETE');toast('Документ удалён');loadDocs();}
+
+async function openAddDoc() {
+  const [cps,warehouses,products] = await Promise.all([api('/counterparties/'),api('/warehouses/'),api('/products/')]);
+  docProducts = products;
+  docItems = [];
+  openModal('Новая накладная', docFormHeader(cps,warehouses), async()=>{
+    const items = getDocItemsFromForm();
+    if(!items.length) throw new Error('Добавьте хотя бы один товар');
+    const data={doc_number:document.getElementById('f-num').value,doc_type:document.getElementById('f-type').value,doc_date:document.getElementById('f-date').value,counterparty_id:+document.getElementById('f-cp').value||null,warehouse_id:+document.getElementById('f-wh').value||null,notes:document.getElementById('f-notes').value||null,items};
+    if(!data.doc_number) throw new Error('Введите номер документа');
+    await api('/documents/','POST',data); toast('Документ создан'); loadDocs();
+  }, true);
+  setTimeout(()=>{ addDocItem(); }, 50);
+}
+
+async function editDoc(id) {
+  const [doc,cps,warehouses,products] = await Promise.all([api('/documents/'+id),api('/counterparties/'),api('/warehouses/'),api('/products/')]);
+  docProducts = products;
+  docItems = (doc.items||[]).map(i=>({product_id:i.product_id,qty:+i.qty,price:+i.price,vat_rate:+i.vat_rate||20}));
+  openModal('Редактировать накладную',
+    docFormHeader(cps,warehouses,doc.doc_number,doc.doc_type,doc.doc_date,doc.counterparty_id,doc.warehouse_id,doc.notes||''),
+    async()=>{
+      const items = getDocItemsFromForm();
+      const fullData={doc_date:document.getElementById('f-date').value,counterparty_id:+document.getElementById('f-cp').value||null,warehouse_id:+document.getElementById('f-wh').value||null,notes:document.getElementById('f-notes').value||null,status:doc.status,items};
+      await api('/documents/'+id,'PUT',fullData); toast('Документ обновлён'); loadDocs();
+    }, true);
+  setTimeout(()=>renderDocItems(), 50);
+}
+
+// FINANCE
+async function loadFinance(type=null) {
+  document.getElementById('finance-table').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    allTxns = await api('/transactions/'+(type&&type!=='all'?'?txn_type='+type:''));
+    document.getElementById('finance-table').innerHTML = !allTxns.length ? '<div class="empty">Операций нет</div>'
+      : `<table><thead><tr><th>Дата</th><th>Тип</th><th>Счёт</th><th>Описание</th><th>Контрагент</th><th>Категория</th><th style="text-align:right">Сумма</th><th></th></tr></thead><tbody>${allTxns.map(t=>`<tr><td class="mono">${fmtDate(t.txn_date)}</td><td><span class="badge ${t.txn_type==='income'?'badge-green':t.txn_type==='expense'?'badge-red':'badge-blue'}">${t.txn_type==='income'?'Приход':t.txn_type==='expense'?'Расход':'Перевод'}</span></td><td>${esc(t.account_name||'—')}</td><td>${esc(t.description)}</td><td>${esc(t.counterparty_name||'—')}</td><td>${esc(t.category||'—')}</td><td style="text-align:right" class="${t.txn_type==='income'?'amount-pos':'amount-neg'}">${t.txn_type==='income'?'+':'−'}${fmt(t.amount)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteTxn(${t.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
+  } catch(e){toast(e.message,'error');}
+}
+function filterTxn(type,btn){document.querySelectorAll('#page-finance .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadFinance(type);}
+async function deleteTxn(id){if(!confirm('Удалить операцию?'))return;await api('/transactions/'+id,'DELETE');toast('Удалено');loadFinance();}
+async function openAddTxn() {
+  const [accounts,cps] = await Promise.all([api('/accounts/'),api('/counterparties/')]);
+  openModal('Новая операция',`<div class="form-row"><div class="form-group"><label>Дата</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label>Тип *</label><select id="f-type"><option value="income">Приход</option><option value="expense">Расход</option><option value="transfer">Перевод</option></select></div></div><div class="form-group"><label>Счёт *</label><select id="f-acc"><option value="">— выберите —</option>${accounts.map(a=>`<option value="${a.id}">${esc(a.name)} (${fmt(a.balance)})</option>`).join('')}</select></div><div class="form-group"><label>Сумма *</label><input id="f-amount" type="number" placeholder="0"></div><div class="form-group"><label>Описание *</label><input id="f-desc" placeholder="Оплата от клиента..."></div><div class="form-row"><div class="form-group"><label>Контрагент</label><select id="f-cp"><option value="">— необязательно —</option>${cps.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div><div class="form-group"><label>Категория</label><input id="f-cat" placeholder="Продажи, Закупки..."></div></div>`,
+  async()=>{
+    const data={txn_date:document.getElementById('f-date').value,txn_type:document.getElementById('f-type').value,account_id:+document.getElementById('f-acc').value,amount:+document.getElementById('f-amount').value,description:document.getElementById('f-desc').value,counterparty_id:+document.getElementById('f-cp').value||null,category:document.getElementById('f-cat').value||null};
+    if(!data.account_id) throw new Error('Выберите счёт');
+    if(!data.amount) throw new Error('Введите сумму');
+    if(!data.description) throw new Error('Введите описание');
+    await api('/transactions/','POST',data); toast('Операция добавлена'); loadFinance();
+  });
+}
+
+// ACCOUNTS
+async function loadAccounts() {
+  document.getElementById('accounts-list').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const accounts = await api('/accounts/');
+    const total = accounts.reduce((s,a)=>s+parseFloat(a.balance||0),0);
+    document.getElementById('accounts-list').innerHTML = `<div class="kpi-grid" style="grid-template-columns:repeat(${Math.min(accounts.length+1,4)},1fr);margin-bottom:20px"><div class="kpi-card blue"><div class="kpi-label">Общий баланс</div><div class="kpi-value">${fmt(total)}</div></div>${accounts.map(a=>`<div class="kpi-card ${a.type==='cash'?'green':'purple'}"><div class="kpi-label">${esc(a.name)}</div><div class="kpi-value">${fmt(a.balance)}</div><div class="kpi-sub">${a.type==='cash'?'Касса':a.type==='bank'?'Банк':'Карта'} · ${esc(a.currency)}</div></div>`).join('')}</div><div class="card"><div class="card-header"><span class="card-title">Все счета</span></div><table><thead><tr><th>Название</th><th>Тип</th><th>Банк</th><th>Р/С</th><th style="text-align:right">Баланс</th><th></th></tr></thead><tbody>${accounts.map(a=>`<tr><td><strong>${esc(a.name)}</strong></td><td><span class="badge ${a.type==='cash'?'badge-green':a.type==='bank'?'badge-blue':'badge-gray'}">${a.type==='cash'?'Касса':a.type==='bank'?'Банк':'Карта'}</span></td><td>${esc(a.bank_name||'—')}</td><td class="mono">${esc(a.account_no||'—')}</td><td style="text-align:right" class="${a.balance>=0?'amount-pos':'amount-neg'}">${fmt(a.balance)}</td><td><button class="btn btn-danger btn-sm" onclick="deleteAccount(${a.id})">✕</button></td></tr>`).join('')}</tbody></table></div>`;
+  } catch(e){toast(e.message,'error');}
+}
+function openAddAccount(){openModal('Новый счёт / касса',`<div class="form-group"><label>Название *</label><input id="f-name" placeholder="Касса №1..."></div><div class="form-row"><div class="form-group"><label>Тип *</label><select id="f-type"><option value="cash">Касса</option><option value="bank">Банковский счёт</option><option value="card">Карта</option></select></div><div class="form-group"><label>Валюта</label><input id="f-cur" value="RUB" maxlength="3"></div></div><div class="form-row"><div class="form-group"><label>Название банка</label><input id="f-bank" placeholder="Сбербанк"></div><div class="form-group"><label>Номер счёта</label><input id="f-accno" placeholder="40702810..."></div></div>`,
+async()=>{const data={name:document.getElementById('f-name').value,type:document.getElementById('f-type').value,currency:document.getElementById('f-cur').value||'RUB',bank_name:document.getElementById('f-bank').value||null,account_no:document.getElementById('f-accno').value||null};if(!data.name)throw new Error('Введите название');await api('/accounts/','POST',data);toast('Счёт добавлен');loadAccounts();});}
+async function deleteAccount(id){if(!confirm('Деактивировать счёт?'))return;await api('/accounts/'+id,'DELETE');toast('Деактивирован');loadAccounts();}
+
+// USERS
+async function loadUsers() {
+  document.getElementById('users-list').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const users = await api('/auth/users');
+    const roleNames={admin:'Администратор',manager:'Менеджер',warehouse:'Кладовщик',accountant:'Бухгалтер',viewer:'Просмотр'};
+    const roleBadge={admin:'badge-red',manager:'badge-blue',warehouse:'badge-yellow',accountant:'badge-green',viewer:'badge-gray'};
+    document.getElementById('users-list').innerHTML = `<div class="card"><table>
+      <thead><tr><th>Логин</th><th>ФИО</th><th>Email</th><th>Роль</th><th>Последний вход</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${users.map(u=>`<tr>
+        <td class="mono">${esc(u.username)}</td><td>${esc(u.full_name||'—')}</td><td>${esc(u.email||'—')}</td>
+        <td><span class="badge ${roleBadge[u.role]||'badge-gray'}">${roleNames[u.role]||u.role}</span></td>
+        <td class="mono" style="font-size:11px">${u.last_login?fmtDate(u.last_login):'Никогда'}</td>
+        <td><span class="badge ${u.is_active?'badge-green':'badge-red'}">${u.is_active?'Активен':'Заблокирован'}</span></td>
+        <td style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" onclick="editUser(${u.id})">✏</button>
+          ${u.username!=='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">✕</button>`:''}
+        </td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } catch(e){toast(e.message,'error');}
+}
+function openAddUser(){
+  openModal('Новый пользователь',`
+    <div class="form-row"><div class="form-group"><label>Логин *</label><input id="f-username" placeholder="ivan"></div><div class="form-group"><label>Пароль *</label><input id="f-password" type="password" placeholder="••••••••"></div></div>
+    <div class="form-group"><label>ФИО</label><input id="f-fullname" placeholder="Иван Иванов"></div>
+    <div class="form-row"><div class="form-group"><label>Email *</label><input id="f-email" placeholder="ivan@company.ru"></div>
+    <div class="form-group"><label>Роль *</label><select id="f-role"><option value="viewer">Просмотр</option><option value="warehouse">Кладовщик</option><option value="accountant">Бухгалтер</option><option value="manager">Менеджер</option><option value="admin">Администратор</option></select></div></div>`,
+  async()=>{
+    const data={username:document.getElementById('f-username').value,password:document.getElementById('f-password').value,full_name:document.getElementById('f-fullname').value||null,email:document.getElementById('f-email').value,role:document.getElementById('f-role').value};
+    if(!data.username||!data.password||!data.email) throw new Error('Заполните логин, пароль и email');
+    await api('/auth/users','POST',data); toast('Пользователь создан'); loadUsers();
+  });
+}
+async function editUser(id) {
+  const users = await api('/auth/users');
+  const u = users.find(x=>x.id===id);
+  if(!u) return;
+  openModal('Редактировать пользователя',`
+    <div class="form-group"><label>Логин</label><input value="${esc(u.username)}" readonly style="opacity:.5"></div>
+    <div class="form-group"><label>ФИО</label><input id="f-fullname" value="${esc(u.full_name||'')}"></div>
+    <div class="form-row"><div class="form-group"><label>Email</label><input id="f-email" value="${esc(u.email||'')}"></div>
+    <div class="form-group"><label>Роль</label><select id="f-role"><option value="viewer"${u.role==='viewer'?' selected':''}>Просмотр</option><option value="warehouse"${u.role==='warehouse'?' selected':''}>Кладовщик</option><option value="accountant"${u.role==='accountant'?' selected':''}>Бухгалтер</option><option value="manager"${u.role==='manager'?' selected':''}>Менеджер</option><option value="admin"${u.role==='admin'?' selected':''}>Администратор</option></select></div></div>
+    <div class="form-row"><div class="form-group"><label>Новый пароль</label><input id="f-password" type="password" placeholder="Оставьте пустым чтобы не менять"></div>
+    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${u.is_active?' selected':''}>Активен</option><option value="false"${!u.is_active?' selected':''}>Заблокирован</option></select></div></div>`,
+  async()=>{
+    const data={full_name:document.getElementById('f-fullname').value||null,email:document.getElementById('f-email').value||null,role:document.getElementById('f-role').value,is_active:document.getElementById('f-active').value==='true'};
+    const pwd=document.getElementById('f-password').value;
+    if(pwd) data.password=pwd;
+    await api('/auth/users/'+id,'PUT',data); toast('Пользователь обновлён'); loadUsers();
+  });
+}
+async function deleteUser(id){if(!confirm('Деактивировать пользователя?'))return;await api('/auth/users/'+id,'DELETE');toast('Деактивирован');loadUsers();}
+
+// INIT
+const savedUser = localStorage.getItem('skladai_user');
+if(getToken() && savedUser) {
+  currentUser = JSON.parse(savedUser);
+  updateUserInfo();
+  hideLogin();
+  loadDashboard();
+} else {
+  showLogin();
+}
+</script>
+</body>
+</html>
