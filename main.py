@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from routers import products, counterparties, documents, transactions, stock, accounts, warehouses, units, auth
@@ -8,8 +8,8 @@ app = FastAPI(title="SkladAI API", version="1.0.0", redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://rainbow-toffee-28a412.netlify.app"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
