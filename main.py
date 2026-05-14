@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from contextlib import asynccontextmanager
 import logging
+import os
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,9 +24,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SkladAI API", version="1.0.0", redirect_slashes=False, lifespan=lifespan)
 
+_cors_origins = [
+    o.strip()
+    for o in os.getenv(
+        "ALLOWED_ORIGINS",
+        "https://rainbow-toffee-28a412.netlify.app,http://localhost:3000,http://localhost:5173,http://localhost:8080",
+    ).split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

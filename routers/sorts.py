@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text
 from database import get_db
 from models import ProductSort, ProductCategory, User
 from schemas import ProductSortCreate, ProductSortUpdate, ProductSortOut, MessageResponse
 from routers.auth import get_current_user, require_role
-from typing import List
+from typing import List, Optional
 
 router = APIRouter()
 
@@ -13,19 +13,30 @@ router = APIRouter()
 @router.get("/", response_model=List[ProductSortOut])
 def list_sorts(
     active_only: bool = True,
-    category_id: int = None,
+    category_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    result = db.execute(text("""
-        SELECT s.*, c.name as category_name
-        FROM product_sorts s
-        JOIN product_categories c ON c.id = s.category_id
-        WHERE (:active_only = FALSE OR s.is_active = TRUE)
-          AND (:category_id IS NULL OR s.category_id = :category_id)
-        ORDER BY c.name, s.name
-    """), {"active_only": active_only, "category_id": category_id})
-    return [dict(r._mapping) for r in result]
+    q = (
+        db.query(ProductSort)
+        .join(ProductSort.category)
+        .options(joinedload(ProductSort.category))
+    )
+    if active_only:
+        q = q.filter(ProductSort.is_active == True)
+    if category_id is not None:
+        q = q.filter(ProductSort.category_id == category_id)
+    q = q.order_by(ProductCategory.name, ProductSort.name)
+    return [
+        {
+            "id": s.id,
+            "name": s.name,
+            "category_id": s.category_id,
+            "is_active": s.is_active,
+            "category_name": s.category.name if s.category else None,
+        }
+        for s in q.all()
+    ]
 
 
 @router.get("/{sort_id}", response_model=ProductSortOut)
