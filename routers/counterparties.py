@@ -14,10 +14,13 @@ def list_counterparties(
     type: Optional[str] = None,
     search: Optional[str] = None,
     has_debt: Optional[bool] = None,
+    include_inactive: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    q = db.query(Counterparty).filter(Counterparty.is_active == True)
+    q = db.query(Counterparty)
+    if not (include_inactive and current_user.role == "admin"):
+        q = q.filter(Counterparty.is_active == True)
     if type:
         q = q.filter(Counterparty.type == type)
     if search:

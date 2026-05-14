@@ -142,6 +142,13 @@ def create_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "warehouse"))
 ):
+    if data.counterparty_id:
+        cp = db.query(Counterparty).filter(
+            Counterparty.id == data.counterparty_id,
+            Counterparty.is_active == True
+        ).first()
+        if not cp:
+            raise HTTPException(400, "Контрагент не активен или не найден")
     doc_data = data.model_dump(exclude={"items"})
     doc = Document(**doc_data)
     db.add(doc)
