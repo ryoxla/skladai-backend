@@ -97,10 +97,14 @@ def list_documents(
     for row in rows:
         items_q = db.execute(text("""
             SELECT di.*, p.name as product_name,
+                   u.short_name as unit_name,
+                   c.name as country_name,
                    di.qty * di.price as amount,
                    di.qty * di.price * di.vat_rate / 100 as vat_amount
             FROM document_items di
             JOIN products p ON p.id = di.product_id
+            LEFT JOIN units u ON u.id = di.unit_id
+            LEFT JOIN countries c ON c.id = di.country_id
             WHERE di.document_id = :did
         """), {"did": row["id"]})
         row["items"] = [dict(i._mapping) for i in items_q]
@@ -126,10 +130,14 @@ def get_document(
     doc = dict(row)
     items_q = db.execute(text("""
         SELECT di.*, p.name as product_name,
+               u.short_name as unit_name,
+               c.name as country_name,
                di.qty * di.price as amount,
                di.qty * di.price * di.vat_rate / 100 as vat_amount
         FROM document_items di
         JOIN products p ON p.id = di.product_id
+        LEFT JOIN units u ON u.id = di.unit_id
+        LEFT JOIN countries c ON c.id = di.country_id
         WHERE di.document_id = :did
     """), {"did": doc_id})
     doc["items"] = [dict(i._mapping) for i in items_q]

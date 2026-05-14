@@ -11,6 +11,7 @@ logging.basicConfig(
 
 from routers import products, counterparties, documents, transactions, stock, accounts, warehouses, units, auth
 from routers import settings as settings_router
+from routers import categories, sorts, countries
 from database import run_migrations
 
 
@@ -40,6 +41,9 @@ app.include_router(accounts.router,       prefix="/api/accounts",       tags=["S
 app.include_router(warehouses.router,     prefix="/api/warehouses",     tags=["Sklady"])
 app.include_router(units.router,          prefix="/api/units",          tags=["Edinicy"])
 app.include_router(settings_router.router, prefix="/api/settings",      tags=["Settings"])
+app.include_router(categories.router,     prefix="/api/categories",     tags=["Kategorii"])
+app.include_router(sorts.router,          prefix="/api/sorts",          tags=["Sorty"])
+app.include_router(countries.router,      prefix="/api/countries",      tags=["Strany"])
 
 _HTML = """<!DOCTYPE html>
 <html lang="ru">
