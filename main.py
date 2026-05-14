@@ -45,9 +45,17 @@ app.add_middleware(
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.error("Unhandled exception on %s %s: %s", request.method, request.url, exc, exc_info=True)
+    # @app.exception_handler(Exception) is routed through ServerErrorMiddleware, which sits
+    # outside CORSMiddleware.  We must add CORS headers manually so the browser can read
+    # the error response instead of seeing only a CORS block.
+    origin = request.headers.get("origin", "")
+    extra_headers: dict = {}
+    if origin in _cors_origins:
+        extra_headers["Access-Control-Allow-Origin"] = origin
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error"},
+        headers=extra_headers or None,
     )
 
 
