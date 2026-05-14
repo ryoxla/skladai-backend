@@ -32,7 +32,7 @@ def get_category(
 ):
     cat = db.query(ProductCategory).filter(ProductCategory.id == category_id).first()
     if not cat:
-        raise HTTPException(404, "Категория не найдена")
+        raise HTTPException(404, "Товар не найден")
     return cat
 
 
@@ -57,8 +57,9 @@ def create_category(
 ):
     cat = ProductCategory(name=data.name, is_active=data.is_active)
     db.add(cat)
-    db.flush()
-    return {"message": "Категория создана", "id": cat.id}
+    db.commit()
+    db.refresh(cat)
+    return {"message": "Товар создан", "id": cat.id}
 
 
 @router.put("/{category_id}", response_model=MessageResponse)
@@ -70,10 +71,10 @@ def update_category(
 ):
     cat = db.query(ProductCategory).filter(ProductCategory.id == category_id).first()
     if not cat:
-        raise HTTPException(404, "Категория не найдена")
+        raise HTTPException(404, "Товар не найден")
     cat.name = data.name
     cat.is_active = data.is_active
-    return {"message": "Категория обновлена", "id": category_id}
+    return {"message": "Товар обновлён", "id": category_id}
 
 
 @router.delete("/{category_id}", response_model=MessageResponse)
@@ -84,12 +85,12 @@ def deactivate_category(
 ):
     cat = db.query(ProductCategory).filter(ProductCategory.id == category_id).first()
     if not cat:
-        raise HTTPException(404, "Категория не найдена")
+        raise HTTPException(404, "Товар не найден")
     active_sorts = db.query(ProductSort).filter(
         ProductSort.category_id == category_id,
         ProductSort.is_active == True
     ).count()
     if active_sorts > 0:
-        raise HTTPException(400, f"Нельзя деактивировать категорию: есть {active_sorts} активных сортов")
+        raise HTTPException(400, f"Нельзя деактивировать товар: есть {active_sorts} активных сортов")
     cat.is_active = False
-    return {"message": "Категория деактивирована", "id": category_id}
+    return {"message": "Товар деактивирован", "id": category_id}
