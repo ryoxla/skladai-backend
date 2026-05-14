@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, contains_eager
 from sqlalchemy import text
 from database import get_db
 from models import ProductSort, ProductCategory, User
@@ -20,7 +20,7 @@ def list_sorts(
     q = (
         db.query(ProductSort)
         .join(ProductSort.category)
-        .options(joinedload(ProductSort.category))
+        .options(contains_eager(ProductSort.category))
     )
     if active_only:
         q = q.filter(ProductSort.is_active == True)
