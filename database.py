@@ -117,3 +117,13 @@ def run_migrations():
         logger.info("Migration 003 (recalculate counterparty balances) applied successfully")
     except Exception as e:
         logger.warning("Migration 003 skipped or failed (may be harmless): %s", e)
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("COMMENT ON TABLE product_categories IS 'Справочник товаров'"))
+            conn.execute(text("COMMENT ON TABLE product_sorts IS 'Справочник сортов товаров'"))
+            conn.execute(text("COMMENT ON COLUMN product_sorts.category_id IS 'ID товара'"))
+            conn.commit()
+        logger.info("Migration 004 (rename category→product comments) applied successfully")
+    except Exception as e:
+        logger.warning("Migration 004 skipped or failed (may be harmless): %s", e)

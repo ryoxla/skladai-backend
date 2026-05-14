@@ -123,10 +123,6 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div class="nav-item active" onclick="showPage('dashboard',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Дашборд
     </div>
-    <div class="nav-item" onclick="showPage('products',this)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Товары
-      <span class="nav-badge" id="badge-low" style="display:none">!</span>
-    </div>
     <div class="nav-item" onclick="showPage('stock',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Остатки
     </div>
@@ -179,12 +175,6 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
         <div class="card"><div class="card-header"><span class="card-title">💰 Крупные должники</span></div><div id="debtors-table"><div class="loading"><div class="spinner"></div></div></div></div>
       </div>
     </div>
-    <div class="page" id="page-products">
-      <div class="card">
-        <div class="filters"><div class="search-bar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="Поиск товара..." oninput="filterProducts(this.value)"></div></div>
-        <div id="products-table"><div class="loading"><div class="spinner"></div></div></div>
-      </div>
-    </div>
     <div class="page" id="page-stock">
       <div class="card">
         <div class="filters">
@@ -234,7 +224,7 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div class="page" id="page-users"><div id="users-list"><div class="loading"><div class="spinner"></div></div></div></div>
     <div class="page" id="page-catalogs">
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
-        <button class="filter-btn active" id="cat-tab-categories" onclick="showCatalogTab('categories')">Категории</button>
+        <button class="filter-btn active" id="cat-tab-categories" onclick="showCatalogTab('categories')">Товары</button>
         <button class="filter-btn" id="cat-tab-sorts" onclick="showCatalogTab('sorts')">Сорта</button>
         <button class="filter-btn" id="cat-tab-units" onclick="showCatalogTab('units')">Единицы измерения</button>
         <button class="filter-btn" id="cat-tab-countries" onclick="showCatalogTab('countries')">Страны</button>
@@ -301,7 +291,7 @@ function showPage(name, el) {
   document.getElementById('page-'+name).classList.add('active');
   if(el) el.classList.add('active');
   currentPage = name;
-  const titles = {dashboard:'Дашборд',products:'Товары',stock:'Остатки на складе',counterparties:'Контрагенты',documents:'Накладные',finance:'Финансы',accounts:'Счета и кассы',users:'Пользователи',catalogs:'Справочники'};
+  const titles = {dashboard:'Дашборд',stock:'Остатки на складе',counterparties:'Контрагенты',documents:'Накладные',finance:'Финансы',accounts:'Счета и кассы',users:'Пользователи',catalogs:'Справочники'};
   document.getElementById('page-title').textContent = titles[name]||name;
   document.getElementById('add-btn').style.display = (name==='dashboard'||name==='stock') ? 'none' : '';
   loadPage(name);
@@ -396,7 +386,6 @@ async function loadDashboard() {
       <div class="kpi-card green"><div class="kpi-icon">📦</div><div class="kpi-label">Стоимость склада</div><div class="kpi-value">${fmt(stockVal.value_sell)}</div><div class="kpi-sub">${stockVal.products_count} позиций</div></div>
       <div class="kpi-card red"><div class="kpi-icon">👥</div><div class="kpi-label">Дебиторский долг</div><div class="kpi-value">${fmt(debt)}</div><div class="kpi-sub">${cpBalances.filter(c=>c.balance<0&&c.type==='client').length} клиентов</div></div>
       <div class="kpi-card purple"><div class="kpi-icon">⚠</div><div class="kpi-label">Критических остатков</div><div class="kpi-value">${stockAlerts.length}</div><div class="kpi-sub">позиций</div></div>`;
-    if(stockAlerts.length>0){document.getElementById('badge-low').style.display='';document.getElementById('badge-low').textContent=stockAlerts.length;}
     document.getElementById('alerts-table').innerHTML = stockAlerts.length===0 ? '<div class="empty">✅ Все остатки в норме</div>'
       : `<table><thead><tr><th>Товар</th><th>Склад</th><th>Остаток</th><th>Минимум</th></tr></thead><tbody>${stockAlerts.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.warehouse)}</td><td><span class="badge ${s.alert_level==='out_of_stock'?'badge-red':'badge-yellow'}">${s.qty} ${esc(s.unit)}</span></td><td class="mono">${s.min_qty}</td></tr>`).join('')}</tbody></table>`;
     const debtors = cpBalances.filter(c=>c.balance<0).sort((a,b)=>a.balance-b.balance).slice(0,6);
@@ -438,7 +427,7 @@ function productForm(p={}, units=[], categories=[], sorts=[]) {
       <div class="form-group"><label>Артикул *</label><input id="f-sku" value="${esc(p.sku||'')}" placeholder="YBL-001"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Категория</label>
+      <div class="form-group"><label>Товар</label>
         <select id="f-category" onchange="onProductCategoryChange(this,${JSON.stringify(sorts).replace(/"/g,'&quot;')})">
           <option value="">— выберите —</option>${catOpts}
         </select>
@@ -638,10 +627,10 @@ function docFormHeader(cps, warehouses, num='', type='receipt', date='', cp='', 
     <div class="form-group">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <label style="margin:0">Позиции товаров</label>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="addDocItem()">+ Добавить товар</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addDocItem()">+ Добавить позицию</button>
       </div>
       <table class="items-table">
-        <thead><tr><th>Категория</th><th style="min-width:160px">Товар</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Страна</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
+        <thead><tr><th>Товар</th><th style="min-width:160px">Сорт</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Страна</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
         <tbody id="doc-items-body"></tbody>
       </table>
       <div class="items-total" id="doc-total">Итого: ${fmt(0)}</div>
@@ -863,11 +852,11 @@ async function loadCatalogCategories() {
   el.innerHTML='<div class="loading"><div class="spinner"></div></div>';
   try {
     const cats = await api('/categories/?active_only=false');
-    el.innerHTML = !cats.length ? '<div class="empty">Категорий нет</div>' : `<div class="card">
+    el.innerHTML = !cats.length ? '<div class="empty">Товаров нет</div>' : `<div class="card">
       <table><thead><tr><th>Название</th><th>Статус</th><th></th></tr></thead>
       <tbody>${cats.map(c=>`<tr>
         <td><strong>${esc(c.name)}</strong></td>
-        <td><span class="badge ${c.is_active?'badge-green':'badge-red'}">${c.is_active?'Активна':'Деактивирована'}</span></td>
+        <td><span class="badge ${c.is_active?'badge-green':'badge-red'}">${c.is_active?'Активен':'Деактивирован'}</span></td>
         <td><button class="btn btn-ghost btn-sm" onclick="editCategory(${c.id},'${esc(c.name)}',${c.is_active})">✏</button>
           ${c.is_active?`<button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id})">✕</button>`:''}</td>
       </tr>`).join('')}</tbody></table></div>`;
@@ -875,18 +864,18 @@ async function loadCatalogCategories() {
 }
 
 function openAddCategory(){
-  openModal('Новая категория',`<div class="form-group"><label>Название *</label><input id="f-name" placeholder="Яблоки"></div>`,
-  async()=>{const name=document.getElementById('f-name').value;if(!name)throw new Error('Введите название');await api('/categories/','POST',{name});toast('Категория добавлена');loadCatalogCategories();});
+  openModal('Новый товар',`<div class="form-group"><label>Название *</label><input id="f-name" placeholder="Яблоки"></div>`,
+  async()=>{const name=document.getElementById('f-name').value;if(!name)throw new Error('Введите название');await api('/categories/','POST',{name});toast('Товар добавлен');loadCatalogCategories();});
 }
 
 function editCategory(id,name,isActive){
-  openModal('Редактировать категорию',`
+  openModal('Редактировать товар',`
     <div class="form-group"><label>Название *</label><input id="f-name" value="${esc(name)}"></div>
-    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активна</option><option value="false"${!isActive?' selected':''}>Деактивирована</option></select></div>`,
-  async()=>{const n=document.getElementById('f-name').value;if(!n)throw new Error('Введите название');await api('/categories/'+id,'PUT',{name:n,is_active:document.getElementById('f-active').value==='true'});toast('Категория обновлена');loadCatalogCategories();});
+    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активен</option><option value="false"${!isActive?' selected':''}>Деактивирован</option></select></div>`,
+  async()=>{const n=document.getElementById('f-name').value;if(!n)throw new Error('Введите название');await api('/categories/'+id,'PUT',{name:n,is_active:document.getElementById('f-active').value==='true'});toast('Товар обновлён');loadCatalogCategories();});
 }
 
-async function deleteCategory(id){if(!confirm('Деактивировать категорию?'))return;try{await api('/categories/'+id,'DELETE');toast('Деактивирована');loadCatalogCategories();}catch(e){toast(e.message,'error');}}
+async function deleteCategory(id){if(!confirm('Деактивировать товар?'))return;try{await api('/categories/'+id,'DELETE');toast('Товар деактивирован');loadCatalogCategories();}catch(e){toast(e.message,'error');}}
 
 async function loadCatalogSorts() {
   const el = document.getElementById('catalog-content');
@@ -894,7 +883,7 @@ async function loadCatalogSorts() {
   try {
     const sorts = await api('/sorts/?active_only=false');
     el.innerHTML = !sorts.length ? '<div class="empty">Сортов нет</div>' : `<div class="card">
-      <table><thead><tr><th>Категория</th><th>Сорт</th><th>Статус</th><th></th></tr></thead>
+      <table><thead><tr><th>Товар</th><th>Сорт</th><th>Статус</th><th></th></tr></thead>
       <tbody>${sorts.map(s=>`<tr>
         <td>${esc(s.category_name||'—')}</td>
         <td><strong>${esc(s.name)}</strong></td>
@@ -908,7 +897,7 @@ async function loadCatalogSorts() {
 async function openAddSort(){
   const cats = await api('/categories/');
   openModal('Новый сорт',`
-    <div class="form-group"><label>Категория *</label><select id="f-cat"><option value="">— выберите —</option>${cats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Товар *</label><select id="f-cat"><option value="">— выберите —</option>${cats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
     <div class="form-group"><label>Название сорта *</label><input id="f-name" placeholder="Голден"></div>`,
   async()=>{const catId=+document.getElementById('f-cat').value;const name=document.getElementById('f-name').value;if(!catId||!name)throw new Error('Заполните все поля');await api('/sorts/','POST',{name,category_id:catId});toast('Сорт добавлен');loadCatalogSorts();});
 }
@@ -916,7 +905,7 @@ async function openAddSort(){
 async function editSort(id,catId,name,isActive){
   const cats = await api('/categories/?active_only=false');
   openModal('Редактировать сорт',`
-    <div class="form-group"><label>Категория *</label><select id="f-cat">${cats.map(c=>`<option value="${c.id}"${c.id===catId?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Товар *</label><select id="f-cat">${cats.map(c=>`<option value="${c.id}"${c.id===catId?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
     <div class="form-group"><label>Название сорта *</label><input id="f-name" value="${esc(name)}"></div>
     <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активен</option><option value="false"${!isActive?' selected':''}>Деактивирован</option></select></div>`,
   async()=>{const n=document.getElementById('f-name').value;const c=+document.getElementById('f-cat').value;if(!n||!c)throw new Error('Заполните все поля');await api('/sorts/'+id,'PUT',{name:n,category_id:c,is_active:document.getElementById('f-active').value==='true'});toast('Сорт обновлён');loadCatalogSorts();});

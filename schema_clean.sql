@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS units (
     created_at TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── КАТЕГОРИИ ТОВАРОВ ─────────────────────────────────────────
+-- ── ТОВАРЫ (справочник, ранее: категории товаров) ─────────────
 
 CREATE TABLE IF NOT EXISTS product_categories (
     id         SERIAL PRIMARY KEY,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS product_categories (
     created_at TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── СОРТА ТОВАРОВ (привязаны к категории) ─────────────────────
+-- ── СОРТА ТОВАРОВ (привязаны к товару через category_id) ──────
 
 CREATE TABLE IF NOT EXISTS product_sorts (
     id          SERIAL PRIMARY KEY,
