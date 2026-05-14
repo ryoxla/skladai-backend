@@ -9,9 +9,49 @@ from models import DocTypeEnum, DocStatusEnum, TxnTypeEnum, CounterpartyTypeEnum
 class UnitBase(BaseModel):
     name: str
     short_name: str
+    is_active: bool = True
 
 class UnitCreate(UnitBase): pass
+class UnitUpdate(UnitBase): pass
 class UnitOut(UnitBase):
+    id: int
+    class Config: from_attributes = True
+
+# ── КАТЕГОРИИ ТОВАРОВ ─────────────────────────────────────────
+
+class ProductCategoryBase(BaseModel):
+    name: str
+    is_active: bool = True
+
+class ProductCategoryCreate(ProductCategoryBase): pass
+class ProductCategoryUpdate(ProductCategoryBase): pass
+class ProductCategoryOut(ProductCategoryBase):
+    id: int
+    class Config: from_attributes = True
+
+# ── СОРТА ТОВАРОВ ─────────────────────────────────────────────
+
+class ProductSortBase(BaseModel):
+    name: str
+    category_id: int
+    is_active: bool = True
+
+class ProductSortCreate(ProductSortBase): pass
+class ProductSortUpdate(ProductSortBase): pass
+class ProductSortOut(ProductSortBase):
+    id: int
+    category_name: Optional[str] = None
+    class Config: from_attributes = True
+
+# ── СТРАНЫ ────────────────────────────────────────────────────
+
+class CountryBase(BaseModel):
+    name: str
+    is_active: bool = True
+
+class CountryCreate(CountryBase): pass
+class CountryUpdate(CountryBase): pass
+class CountryOut(CountryBase):
     id: int
     class Config: from_attributes = True
 
@@ -114,6 +154,8 @@ class DocumentItemBase(BaseModel):
     qty: Decimal
     price: Decimal
     vat_rate: Decimal = Decimal("20")
+    unit_id: Optional[int] = None
+    country_id: Optional[int] = None
 
 class DocumentItemCreate(DocumentItemBase): pass
 class DocumentItemOut(DocumentItemBase):
@@ -121,6 +163,8 @@ class DocumentItemOut(DocumentItemBase):
     amount: Optional[Decimal] = None
     vat_amount: Optional[Decimal] = None
     product_name: Optional[str] = None
+    unit_name: Optional[str] = None
+    country_name: Optional[str] = None
     class Config: from_attributes = True
 
 class DocumentBase(BaseModel):

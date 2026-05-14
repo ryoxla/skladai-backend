@@ -142,6 +142,9 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div class="nav-item" onclick="showPage('accounts',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Счета и кассы
     </div>
+    <div class="nav-item" onclick="showPage('catalogs',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>Справочники
+    </div>
     <div class="nav-item" id="nav-users" onclick="showPage('users',this)" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Пользователи
     </div>
@@ -229,6 +232,15 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     </div>
     <div class="page" id="page-accounts"><div id="accounts-list"><div class="loading"><div class="spinner"></div></div></div></div>
     <div class="page" id="page-users"><div id="users-list"><div class="loading"><div class="spinner"></div></div></div></div>
+    <div class="page" id="page-catalogs">
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="filter-btn active" id="cat-tab-categories" onclick="showCatalogTab('categories')">Категории</button>
+        <button class="filter-btn" id="cat-tab-sorts" onclick="showCatalogTab('sorts')">Сорта</button>
+        <button class="filter-btn" id="cat-tab-units" onclick="showCatalogTab('units')">Единицы измерения</button>
+        <button class="filter-btn" id="cat-tab-countries" onclick="showCatalogTab('countries')">Страны</button>
+      </div>
+      <div id="catalog-content"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
   </div>
 </div>
 
@@ -252,6 +264,8 @@ let modalSaveFn = null;
 let currentUser = null;
 let docProducts = [];
 let docItems = [];
+let docCategories = [], docUnits = [], docCountries = [], docAllSorts = [];
+let currentCatalogTab = 'categories';
 
 const fmt = n => new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:0}).format(n||0);
 const fmtDate = d => d ? new Date(d).toLocaleDateString('ru-RU') : '—';
@@ -287,7 +301,7 @@ function showPage(name, el) {
   document.getElementById('page-'+name).classList.add('active');
   if(el) el.classList.add('active');
   currentPage = name;
-  const titles = {dashboard:'Дашборд',products:'Товары',stock:'Остатки на складе',counterparties:'Контрагенты',documents:'Накладные',finance:'Финансы',accounts:'Счета и кассы',users:'Пользователи'};
+  const titles = {dashboard:'Дашборд',products:'Товары',stock:'Остатки на складе',counterparties:'Контрагенты',documents:'Накладные',finance:'Финансы',accounts:'Счета и кассы',users:'Пользователи',catalogs:'Справочники'};
   document.getElementById('page-title').textContent = titles[name]||name;
   document.getElementById('add-btn').style.display = (name==='dashboard'||name==='stock') ? 'none' : '';
   loadPage(name);
@@ -304,10 +318,11 @@ function loadPage(name) {
   else if(name==='finance') loadFinance();
   else if(name==='accounts') loadAccounts();
   else if(name==='users') loadUsers();
+  else if(name==='catalogs') { currentCatalogTab = currentCatalogTab||'categories'; showCatalogTab(currentCatalogTab); }
 }
 
 function openAddModal() {
-  const fns = {products:openAddProduct,counterparties:openAddCP,documents:openAddDoc,finance:openAddTxn,accounts:openAddAccount,users:openAddUser};
+  const fns = {products:openAddProduct,counterparties:openAddCP,documents:openAddDoc,finance:openAddTxn,accounts:openAddAccount,users:openAddUser,catalogs:openAddCatalogItem};
   if(fns[currentPage]) fns[currentPage]();
 }
 
@@ -413,15 +428,26 @@ function renderProducts(list) {
 }
 function filterProducts(q){renderProducts(allProducts.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.sku.toLowerCase().includes(q.toLowerCase())));}
 
-function productForm(p={}, units=[]) {
+function productForm(p={}, units=[], categories=[], sorts=[]) {
+  const catOpts = categories.map(c=>`<option value="${c.id}"${c.id===p.category_id?' selected':''}>${esc(c.name)}</option>`).join('');
+  const sortOpts = sorts.filter(s=>!p.category_id||s.category_id===p.category_id)
+    .map(s=>`<option value="${esc(s.name)}"${s.name===p.sort?' selected':''}>${esc(s.name)}</option>`).join('');
   return `
     <div class="form-row">
-      <div class="form-group"><label>Наименование *</label><input id="f-name" value="${esc(p.name||'')}" placeholder="Яблоки"></div>
+      <div class="form-group"><label>Наименование *</label><input id="f-name" value="${esc(p.name||'')}" placeholder="Яблоки Голден"></div>
       <div class="form-group"><label>Артикул *</label><input id="f-sku" value="${esc(p.sku||'')}" placeholder="YBL-001"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Сорт</label><input id="f-sort" value="${esc(p.sort||'')}" placeholder="Гренни Смит"></div>
-      <div class="form-group"><label>Страна</label><input id="f-country" value="${esc(p.country||'')}" placeholder="Польша"></div>
+      <div class="form-group"><label>Категория</label>
+        <select id="f-category" onchange="onProductCategoryChange(this,${JSON.stringify(sorts).replace(/"/g,'&quot;')})">
+          <option value="">— выберите —</option>${catOpts}
+        </select>
+      </div>
+      <div class="form-group"><label>Сорт</label>
+        <select id="f-sort">
+          <option value="">— выберите —</option>${sortOpts}
+        </select>
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Единица измерения *</label><select id="f-unit">${units.map(u=>`<option value="${u.id}"${u.id===p.unit_id?' selected':''}>${u.name} (${u.short_name})</option>`).join('')}</select></div>
@@ -433,12 +459,23 @@ function productForm(p={}, units=[]) {
     </div>`;
 }
 
+function onProductCategoryChange(sel, allSorts) {
+  const catId = +sel.value;
+  const sortSel = document.getElementById('f-sort');
+  if(!sortSel) return;
+  const filtered = catId ? allSorts.filter(s=>s.category_id===catId) : allSorts;
+  sortSel.innerHTML = '<option value="">— выберите —</option>' +
+    filtered.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+}
+
 function getProductData() {
+  const catSel = document.getElementById('f-category');
+  const sortSel = document.getElementById('f-sort');
   return {
     name: document.getElementById('f-name').value,
     sku: document.getElementById('f-sku').value,
-    sort: document.getElementById('f-sort').value||null,
-    country: document.getElementById('f-country').value||null,
+    category_id: catSel&&+catSel.value||null,
+    sort: sortSel&&sortSel.value||null,
     unit_id: +document.getElementById('f-unit').value,
     min_qty: +document.getElementById('f-minqty').value||0,
     vat_rate: +document.getElementById('f-vat').value||20,
@@ -447,8 +484,8 @@ function getProductData() {
 }
 
 async function openAddProduct() {
-  const units = await api('/units/');
-  openModal('Новый товар', productForm({}, units), async()=>{
+  const [units, categories, sorts] = await Promise.all([api('/units/'), api('/categories/'), api('/sorts/')]);
+  openModal('Новый товар', productForm({}, units, categories, sorts), async()=>{
     const data = getProductData();
     if(!data.name||!data.sku) throw new Error('Заполните название и артикул');
     await api('/products/','POST',data); toast('Товар добавлен'); loadProducts();
@@ -456,8 +493,8 @@ async function openAddProduct() {
 }
 
 async function editProduct(id) {
-  const [p,units] = await Promise.all([api('/products/'+id),api('/units/')]);
-  openModal('Редактировать товар', productForm(p, units), async()=>{
+  const [p, units, categories, sorts] = await Promise.all([api('/products/'+id), api('/units/'), api('/categories/'), api('/sorts/')]);
+  openModal('Редактировать товар', productForm(p, units, categories, sorts), async()=>{
     const data = getProductData();
     await api('/products/'+id,'PUT',data); toast('Товар обновлён'); loadProducts();
   });
@@ -508,15 +545,27 @@ function docItemsOptions() {
   return docProducts.map(p=>`<option value="${p.id}" data-buy="0" data-sell="0">${esc(p.name)} (${p.sku}) — ${p.qty||0} на складе</option>`).join('');
 }
 
+function getProductsForCategory(catId) {
+  if(!catId) return docProducts;
+  return docProducts.filter(p=>p.category_id===catId);
+}
+
 function renderDocItems() {
   const tbody = document.getElementById('doc-items-body');
   if(!tbody) return;
   tbody.innerHTML = docItems.map((item,i)=>{
-    const opts = docProducts.map(p=>`<option value="${p.id}"${p.id===item.product_id?' selected':''}>${esc(p.name)} (${p.sku}) — ${p.qty||0} на складе</option>`).join('');
+    const filteredProds = getProductsForCategory(item.category_id||null);
+    const prodOpts = filteredProds.map(p=>`<option value="${p.id}"${p.id===item.product_id?' selected':''}>${esc(p.name)} (${p.sku})</option>`).join('');
+    const catOpts = '<option value="">— Все —</option>'+docCategories.map(c=>`<option value="${c.id}"${c.id===item.category_id?' selected':''}>${esc(c.name)}</option>`).join('');
+    const unitOpts = '<option value="">—</option>'+docUnits.map(u=>`<option value="${u.id}"${u.id===item.unit_id?' selected':''}>${esc(u.short_name)}</option>`).join('');
+    const countryOpts = '<option value="">—</option>'+docCountries.map(c=>`<option value="${c.id}"${c.id===item.country_id?' selected':''}>${esc(c.name)}</option>`).join('');
     return `<tr>
-      <td><select onchange="onItemProdChange(${i},this)">${opts}</select></td>
-      <td><input type="number" value="${item.qty}" min="0.001" step="0.001" oninput="onItemQtyPrice(${i},this,'qty')" style="width:80px"></td>
-      <td><input type="number" value="${item.price}" min="0" step="0.01" oninput="onItemQtyPrice(${i},this,'price')" style="width:100px"></td>
+      <td style="min-width:110px"><select onchange="onItemCatChange(${i},this)" style="font-size:11px">${catOpts}</select></td>
+      <td style="min-width:160px"><select onchange="onItemProdChange(${i},this)">${prodOpts}</select></td>
+      <td><input type="number" value="${item.qty}" min="0.001" step="0.001" oninput="onItemField(${i},this,'qty')" style="width:70px"></td>
+      <td style="min-width:70px"><select onchange="onItemField(${i},this,'unit_id')">${unitOpts}</select></td>
+      <td><input type="number" value="${item.price}" min="0" step="0.01" oninput="onItemField(${i},this,'price')" style="width:90px"></td>
+      <td style="min-width:100px"><select onchange="onItemField(${i},this,'country_id')">${countryOpts}</select></td>
       <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap" id="item-sum-${i}">${fmt(item.qty*item.price)}</td>
       <td><button class="btn btn-danger btn-sm" onclick="removeDocItem(${i})">✕</button></td>
     </tr>`;
@@ -524,13 +573,20 @@ function renderDocItems() {
   updateDocTotal();
 }
 
+function onItemCatChange(i, sel) {
+  docItems[i].category_id = +sel.value||null;
+  docItems[i].product_id = getProductsForCategory(docItems[i].category_id)[0]?.id||null;
+  renderDocItems();
+}
+
 function onItemProdChange(i, sel) {
   docItems[i].product_id = +sel.value;
   updateDocTotal();
 }
 
-function onItemQtyPrice(i, el, field) {
-  docItems[i][field] = +el.value || 0;
+function onItemField(i, el, field) {
+  const v = (field==='unit_id'||field==='country_id') ? (+el.value||null) : (+el.value||0);
+  docItems[i][field] = v;
   const sumEl = document.getElementById('item-sum-'+i);
   if(sumEl) sumEl.textContent = fmt(docItems[i].qty * docItems[i].price);
   updateDocTotal();
@@ -540,7 +596,7 @@ function removeDocItem(i) { docItems.splice(i,1); renderDocItems(); }
 
 function addDocItem() {
   if(!docProducts.length) return;
-  docItems.push({product_id: docProducts[0].id, qty:1, price:0, vat_rate:20});
+  docItems.push({product_id: docProducts[0].id, category_id: docProducts[0].category_id||null, qty:1, price:0, vat_rate:20, unit_id:null, country_id:null});
   renderDocItems();
 }
 
@@ -552,7 +608,8 @@ function updateDocTotal() {
 
 function getDocItemsFromForm() {
   return docItems.filter(i=>i.product_id&&i.qty>0).map(i=>({
-    product_id: i.product_id, qty: i.qty, price: i.price, vat_rate: i.vat_rate||20
+    product_id: i.product_id, qty: i.qty, price: i.price, vat_rate: i.vat_rate||20,
+    unit_id: i.unit_id||null, country_id: i.country_id||null
   }));
 }
 
@@ -584,7 +641,7 @@ function docFormHeader(cps, warehouses, num='', type='receipt', date='', cp='', 
         <button type="button" class="btn btn-ghost btn-sm" onclick="addDocItem()">+ Добавить товар</button>
       </div>
       <table class="items-table">
-        <thead><tr><th style="min-width:200px">Товар</th><th>Кол-во</th><th>Цена</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
+        <thead><tr><th>Категория</th><th style="min-width:160px">Товар</th><th>Кол-во</th><th>Ед.</th><th>Цена</th><th>Страна</th><th style="text-align:right">Сумма</th><th></th></tr></thead>
         <tbody id="doc-items-body"></tbody>
       </table>
       <div class="items-total" id="doc-total">Итого: ${fmt(0)}</div>
@@ -621,8 +678,11 @@ async function cancelDoc(id){if(!confirm('Отменить проведение 
 async function deleteDoc(id){if(!confirm('Удалить документ? Это действие необратимо.'))return;await api('/documents/'+id,'DELETE');toast('Документ удалён');loadDocs();}
 
 async function openAddDoc() {
-  const [cps,warehouses,products] = await Promise.all([api('/counterparties/'),api('/warehouses/'),api('/products/')]);
-  docProducts = products;
+  const [cps,warehouses,products,categories,units,countries] = await Promise.all([
+    api('/counterparties/'),api('/warehouses/'),api('/products/'),
+    api('/categories/'),api('/units/'),api('/countries/')
+  ]);
+  docProducts = products; docCategories = categories; docUnits = units; docCountries = countries;
   docItems = [];
   openModal('Новая накладная', docFormHeader(cps,warehouses), async()=>{
     const items = getDocItemsFromForm();
@@ -635,9 +695,15 @@ async function openAddDoc() {
 }
 
 async function editDoc(id) {
-  const [doc,cps,warehouses,products] = await Promise.all([api('/documents/'+id),api('/counterparties/'),api('/warehouses/'),api('/products/')]);
-  docProducts = products;
-  docItems = (doc.items||[]).map(i=>({product_id:i.product_id,qty:+i.qty,price:+i.price,vat_rate:+i.vat_rate||20}));
+  const [doc,cps,warehouses,products,categories,units,countries] = await Promise.all([
+    api('/documents/'+id),api('/counterparties/'),api('/warehouses/'),api('/products/'),
+    api('/categories/'),api('/units/'),api('/countries/')
+  ]);
+  docProducts = products; docCategories = categories; docUnits = units; docCountries = countries;
+  docItems = (doc.items||[]).map(i=>{
+    const prod = products.find(p=>p.id===i.product_id);
+    return {product_id:i.product_id,category_id:prod?.category_id||null,qty:+i.qty,price:+i.price,vat_rate:+i.vat_rate||20,unit_id:i.unit_id||null,country_id:i.country_id||null};
+  });
   openModal('Редактировать накладную',
     docFormHeader(cps,warehouses,doc.doc_number,doc.doc_type,doc.doc_date,doc.counterparty_id,doc.warehouse_id,doc.notes||''),
     async()=>{
@@ -770,6 +836,161 @@ async function editUser(id) {
   });
 }
 async function deleteUser(id){if(!confirm('Деактивировать пользователя?'))return;await api('/auth/users/'+id,'DELETE');toast('Деактивирован');loadUsers();}
+
+// CATALOGS
+
+function showCatalogTab(tab) {
+  currentCatalogTab = tab;
+  ['categories','sorts','units','countries'].forEach(t=>{
+    const btn = document.getElementById('cat-tab-'+t);
+    if(btn) btn.classList.toggle('active', t===tab);
+  });
+  if(tab==='categories') loadCatalogCategories();
+  else if(tab==='sorts') loadCatalogSorts();
+  else if(tab==='units') loadCatalogUnits();
+  else if(tab==='countries') loadCatalogCountries();
+}
+
+function openAddCatalogItem() {
+  if(currentCatalogTab==='categories') openAddCategory();
+  else if(currentCatalogTab==='sorts') openAddSort();
+  else if(currentCatalogTab==='units') openAddCatalogUnit();
+  else if(currentCatalogTab==='countries') openAddCountry();
+}
+
+async function loadCatalogCategories() {
+  const el = document.getElementById('catalog-content');
+  el.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const cats = await api('/categories/?active_only=false');
+    el.innerHTML = !cats.length ? '<div class="empty">Категорий нет</div>' : `<div class="card">
+      <table><thead><tr><th>Название</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${cats.map(c=>`<tr>
+        <td><strong>${esc(c.name)}</strong></td>
+        <td><span class="badge ${c.is_active?'badge-green':'badge-red'}">${c.is_active?'Активна':'Деактивирована'}</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="editCategory(${c.id},'${esc(c.name)}',${c.is_active})">✏</button>
+          ${c.is_active?`<button class="btn btn-danger btn-sm" onclick="deleteCategory(${c.id})">✕</button>`:''}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } catch(e){el.innerHTML='<div class="empty">Ошибка загрузки</div>';}
+}
+
+function openAddCategory(){
+  openModal('Новая категория',`<div class="form-group"><label>Название *</label><input id="f-name" placeholder="Яблоки"></div>`,
+  async()=>{const name=document.getElementById('f-name').value;if(!name)throw new Error('Введите название');await api('/categories/','POST',{name});toast('Категория добавлена');loadCatalogCategories();});
+}
+
+function editCategory(id,name,isActive){
+  openModal('Редактировать категорию',`
+    <div class="form-group"><label>Название *</label><input id="f-name" value="${esc(name)}"></div>
+    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активна</option><option value="false"${!isActive?' selected':''}>Деактивирована</option></select></div>`,
+  async()=>{const n=document.getElementById('f-name').value;if(!n)throw new Error('Введите название');await api('/categories/'+id,'PUT',{name:n,is_active:document.getElementById('f-active').value==='true'});toast('Категория обновлена');loadCatalogCategories();});
+}
+
+async function deleteCategory(id){if(!confirm('Деактивировать категорию?'))return;try{await api('/categories/'+id,'DELETE');toast('Деактивирована');loadCatalogCategories();}catch(e){toast(e.message,'error');}}
+
+async function loadCatalogSorts() {
+  const el = document.getElementById('catalog-content');
+  el.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const sorts = await api('/sorts/?active_only=false');
+    el.innerHTML = !sorts.length ? '<div class="empty">Сортов нет</div>' : `<div class="card">
+      <table><thead><tr><th>Категория</th><th>Сорт</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${sorts.map(s=>`<tr>
+        <td>${esc(s.category_name||'—')}</td>
+        <td><strong>${esc(s.name)}</strong></td>
+        <td><span class="badge ${s.is_active?'badge-green':'badge-red'}">${s.is_active?'Активен':'Деактивирован'}</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="editSort(${s.id},${s.category_id},'${esc(s.name)}',${s.is_active})">✏</button>
+          ${s.is_active?`<button class="btn btn-danger btn-sm" onclick="deleteSort(${s.id})">✕</button>`:''}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } catch(e){el.innerHTML='<div class="empty">Ошибка загрузки</div>';}
+}
+
+async function openAddSort(){
+  const cats = await api('/categories/');
+  openModal('Новый сорт',`
+    <div class="form-group"><label>Категория *</label><select id="f-cat"><option value="">— выберите —</option>${cats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Название сорта *</label><input id="f-name" placeholder="Голден"></div>`,
+  async()=>{const catId=+document.getElementById('f-cat').value;const name=document.getElementById('f-name').value;if(!catId||!name)throw new Error('Заполните все поля');await api('/sorts/','POST',{name,category_id:catId});toast('Сорт добавлен');loadCatalogSorts();});
+}
+
+async function editSort(id,catId,name,isActive){
+  const cats = await api('/categories/?active_only=false');
+  openModal('Редактировать сорт',`
+    <div class="form-group"><label>Категория *</label><select id="f-cat">${cats.map(c=>`<option value="${c.id}"${c.id===catId?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>
+    <div class="form-group"><label>Название сорта *</label><input id="f-name" value="${esc(name)}"></div>
+    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активен</option><option value="false"${!isActive?' selected':''}>Деактивирован</option></select></div>`,
+  async()=>{const n=document.getElementById('f-name').value;const c=+document.getElementById('f-cat').value;if(!n||!c)throw new Error('Заполните все поля');await api('/sorts/'+id,'PUT',{name:n,category_id:c,is_active:document.getElementById('f-active').value==='true'});toast('Сорт обновлён');loadCatalogSorts();});
+}
+
+async function deleteSort(id){if(!confirm('Деактивировать сорт?'))return;await api('/sorts/'+id,'DELETE');toast('Деактивирован');loadCatalogSorts();}
+
+async function loadCatalogUnits() {
+  const el = document.getElementById('catalog-content');
+  el.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const units = await api('/units/?active_only=false');
+    el.innerHTML = !units.length ? '<div class="empty">Единиц нет</div>' : `<div class="card">
+      <table><thead><tr><th>Название</th><th>Сокращение</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${units.map(u=>`<tr>
+        <td><strong>${esc(u.name)}</strong></td>
+        <td class="mono">${esc(u.short_name)}</td>
+        <td><span class="badge ${u.is_active?'badge-green':'badge-red'}">${u.is_active?'Активна':'Деактивирована'}</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="editCatalogUnit(${u.id},'${esc(u.name)}','${esc(u.short_name)}',${u.is_active})">✏</button>
+          ${u.is_active?`<button class="btn btn-danger btn-sm" onclick="deleteCatalogUnit(${u.id})">✕</button>`:''}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } catch(e){el.innerHTML='<div class="empty">Ошибка загрузки</div>';}
+}
+
+function openAddCatalogUnit(){
+  openModal('Новая единица измерения',`
+    <div class="form-row">
+      <div class="form-group"><label>Название *</label><input id="f-name" placeholder="килограмм"></div>
+      <div class="form-group"><label>Сокращение *</label><input id="f-short" placeholder="кг" maxlength="10"></div>
+    </div>`,
+  async()=>{const n=document.getElementById('f-name').value;const s=document.getElementById('f-short').value;if(!n||!s)throw new Error('Заполните все поля');await api('/units/','POST',{name:n,short_name:s});toast('Единица добавлена');loadCatalogUnits();});
+}
+
+function editCatalogUnit(id,name,shortName,isActive){
+  openModal('Редактировать единицу',`
+    <div class="form-row">
+      <div class="form-group"><label>Название *</label><input id="f-name" value="${esc(name)}"></div>
+      <div class="form-group"><label>Сокращение *</label><input id="f-short" value="${esc(shortName)}" maxlength="10"></div>
+    </div>
+    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активна</option><option value="false"${!isActive?' selected':''}>Деактивирована</option></select></div>`,
+  async()=>{const n=document.getElementById('f-name').value;const s=document.getElementById('f-short').value;if(!n||!s)throw new Error('Заполните все поля');await api('/units/'+id,'PUT',{name:n,short_name:s,is_active:document.getElementById('f-active').value==='true'});toast('Единица обновлена');loadCatalogUnits();});
+}
+
+async function deleteCatalogUnit(id){if(!confirm('Деактивировать единицу измерения?'))return;await api('/units/'+id,'DELETE');toast('Деактивирована');loadCatalogUnits();}
+
+async function loadCatalogCountries() {
+  const el = document.getElementById('catalog-content');
+  el.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const countries = await api('/countries/?active_only=false');
+    el.innerHTML = !countries.length ? '<div class="empty">Стран нет</div>' : `<div class="card">
+      <table><thead><tr><th>Страна</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${countries.map(c=>`<tr>
+        <td><strong>${esc(c.name)}</strong></td>
+        <td><span class="badge ${c.is_active?'badge-green':'badge-red'}">${c.is_active?'Активна':'Деактивирована'}</span></td>
+        <td><button class="btn btn-ghost btn-sm" onclick="editCountry(${c.id},'${esc(c.name)}',${c.is_active})">✏</button>
+          ${c.is_active?`<button class="btn btn-danger btn-sm" onclick="deleteCountry(${c.id})">✕</button>`:''}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  } catch(e){el.innerHTML='<div class="empty">Ошибка загрузки</div>';}
+}
+
+function openAddCountry(){
+  openModal('Новая страна',`<div class="form-group"><label>Название *</label><input id="f-name" placeholder="Россия"></div>`,
+  async()=>{const n=document.getElementById('f-name').value;if(!n)throw new Error('Введите название');await api('/countries/','POST',{name:n});toast('Страна добавлена');loadCatalogCountries();});
+}
+
+function editCountry(id,name,isActive){
+  openModal('Редактировать страну',`
+    <div class="form-group"><label>Название *</label><input id="f-name" value="${esc(name)}"></div>
+    <div class="form-group"><label>Статус</label><select id="f-active"><option value="true"${isActive?' selected':''}>Активна</option><option value="false"${!isActive?' selected':''}>Деактивирована</option></select></div>`,
+  async()=>{const n=document.getElementById('f-name').value;if(!n)throw new Error('Введите название');await api('/countries/'+id,'PUT',{name:n,is_active:document.getElementById('f-active').value==='true'});toast('Страна обновлена');loadCatalogCountries();});
+}
+
+async function deleteCountry(id){if(!confirm('Деактивировать страну?'))return;await api('/countries/'+id,'DELETE');toast('Деактивирована');loadCatalogCountries();}
 
 // BG COLOR
 async function loadBgColor() {

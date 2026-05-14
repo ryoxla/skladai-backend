@@ -40,13 +40,32 @@ class Unit(Base):
     id         = Column(Integer, primary_key=True)
     name       = Column(String(50), nullable=False)
     short_name = Column(String(10), nullable=False, unique=True)
+    is_active  = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class ProductCategory(Base):
     __tablename__ = "product_categories"
-    id        = Column(Integer, primary_key=True)
-    name      = Column(String(100), nullable=False)
-    parent_id = Column(Integer, ForeignKey("product_categories.id"))
+    id         = Column(Integer, primary_key=True)
+    name       = Column(String(100), nullable=False)
+    parent_id  = Column(Integer, ForeignKey("product_categories.id"))
+    is_active  = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    sorts      = relationship("ProductSort", back_populates="category")
+
+class ProductSort(Base):
+    __tablename__ = "product_sorts"
+    id          = Column(Integer, primary_key=True)
+    name        = Column(String(100), nullable=False)
+    category_id = Column(Integer, ForeignKey("product_categories.id"), nullable=False)
+    is_active   = Column(Boolean, default=True)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+    category    = relationship("ProductCategory", back_populates="sorts")
+
+class Country(Base):
+    __tablename__ = "countries"
+    id         = Column(Integer, primary_key=True)
+    name       = Column(String(100), nullable=False, unique=True)
+    is_active  = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Warehouse(Base):
@@ -145,6 +164,8 @@ class DocumentItem(Base):
     qty         = Column(Numeric(15, 3), nullable=False)
     price       = Column(Numeric(15, 2), default=0)
     vat_rate    = Column(Numeric(5, 2), default=20)
+    unit_id     = Column(Integer, ForeignKey("units.id"))
+    country_id  = Column(Integer, ForeignKey("countries.id"))
     document    = relationship("Document", back_populates="items")
 
 # ── ФИНАНСЫ ───────────────────────────────────────────────────
