@@ -7,7 +7,7 @@ from models import Document, DocumentItem, Counterparty, Stock, User
 from schemas import DocumentCreate, DocumentUpdate, DocumentOut, MessageResponse
 from routers.auth import get_current_user, require_role
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime, timezone
 
 router = APIRouter()
 
@@ -240,6 +240,7 @@ def confirm_document(
     if doc.status == "cancelled":
         raise HTTPException(400, "Нельзя провести отменённый документ")
     doc.status = "confirmed"
+    doc.confirmed_at = datetime.now(timezone.utc)
     db.flush()
 
     recalculate_stock(db)
