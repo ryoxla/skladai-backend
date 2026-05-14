@@ -28,7 +28,26 @@ RECALC_SQL = """
     JOIN documents d ON d.id = di.document_id
     WHERE d.status = 'confirmed'
       AND d.warehouse_id IS NOT NULL
+      AND di.product_id IS NOT NULL
     GROUP BY di.product_id, d.warehouse_id
+"""
+
+ITEMS_SQL = """
+    SELECT di.*,
+           p.name as product_name,
+           ps.name as sort_name,
+           pc.name as category_name,
+           u.short_name as unit_name,
+           c.name as country_name,
+           di.qty * di.price as amount,
+           di.qty * di.price * di.vat_rate / 100 as vat_amount
+    FROM document_items di
+    LEFT JOIN products p ON p.id = di.product_id
+    LEFT JOIN product_sorts ps ON ps.id = di.sort_id
+    LEFT JOIN product_categories pc ON pc.id = ps.category_id
+    LEFT JOIN units u ON u.id = di.unit_id
+    LEFT JOIN countries c ON c.id = di.country_id
+    WHERE di.document_id = :did
 """
 
 def recalculate_stock(db: Session):
@@ -95,18 +114,7 @@ def list_documents(
     result = db.execute(text(query), params)
     rows = [dict(r._mapping) for r in result]
     for row in rows:
-        items_q = db.execute(text("""
-            SELECT di.*, p.name as product_name,
-                   u.short_name as unit_name,
-                   c.name as country_name,
-                   di.qty * di.price as amount,
-                   di.qty * di.price * di.vat_rate / 100 as vat_amount
-            FROM document_items di
-            JOIN products p ON p.id = di.product_id
-            LEFT JOIN units u ON u.id = di.unit_id
-            LEFT JOIN countries c ON c.id = di.country_id
-            WHERE di.document_id = :did
-        """), {"did": row["id"]})
+        items_q = db.execute(text(ITEMS_SQL), {"did": row["id"]})
         row["items"] = [dict(i._mapping) for i in items_q]
     return rows
 
@@ -128,18 +136,7 @@ def get_document(
     if not row:
         raise HTTPException(404, "Документ не найден")
     doc = dict(row)
-    items_q = db.execute(text("""
-        SELECT di.*, p.name as product_name,
-               u.short_name as unit_name,
-               c.name as country_name,
-               di.qty * di.price as amount,
-               di.qty * di.price * di.vat_rate / 100 as vat_amount
-        FROM document_items di
-        JOIN products p ON p.id = di.product_id
-        LEFT JOIN units u ON u.id = di.unit_id
-        LEFT JOIN countries c ON c.id = di.country_id
-        WHERE di.document_id = :did
-    """), {"did": doc_id})
+    items_q = db.execute(text(ITEMS_SQL), {"did": doc_id})
     doc["items"] = [dict(i._mapping) for i in items_q]
     return doc
 

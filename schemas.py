@@ -150,7 +150,8 @@ class StockOut(BaseModel):
 # ── ДОКУМЕНТЫ ─────────────────────────────────────────────────
 
 class DocumentItemBase(BaseModel):
-    product_id: int
+    product_id: Optional[int] = None
+    sort_id: Optional[int] = None
     qty: Decimal
     price: Decimal
     vat_rate: Decimal = Decimal("20")
@@ -163,6 +164,8 @@ class DocumentItemOut(DocumentItemBase):
     amount: Optional[Decimal] = None
     vat_amount: Optional[Decimal] = None
     product_name: Optional[str] = None
+    sort_name: Optional[str] = None
+    category_name: Optional[str] = None
     unit_name: Optional[str] = None
     country_name: Optional[str] = None
     class Config: from_attributes = True

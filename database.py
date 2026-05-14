@@ -127,3 +127,16 @@ def run_migrations():
         logger.info("Migration 004 (rename category→product comments) applied successfully")
     except Exception as e:
         logger.warning("Migration 004 skipped or failed (may be harmless): %s", e)
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE document_items ALTER COLUMN product_id DROP NOT NULL"
+            ))
+            conn.execute(text(
+                "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS sort_id INTEGER REFERENCES product_sorts(id)"
+            ))
+            conn.commit()
+        logger.info("Migration 005 (document_items sort_id, nullable product_id) applied successfully")
+    except Exception as e:
+        logger.warning("Migration 005 skipped or failed (may be harmless): %s", e)

@@ -160,7 +160,8 @@ class DocumentItem(Base):
     __tablename__ = "document_items"
     id          = Column(Integer, primary_key=True)
     document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
-    product_id  = Column(Integer, ForeignKey("products.id"), nullable=False)
+    product_id  = Column(Integer, ForeignKey("products.id"))
+    sort_id     = Column(Integer, ForeignKey("product_sorts.id"))
     qty         = Column(Numeric(15, 3), nullable=False)
     price       = Column(Numeric(15, 2), default=0)
     vat_rate    = Column(Numeric(5, 2), default=20)
