@@ -153,12 +153,13 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS document_items (
     id          SERIAL PRIMARY KEY,
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    product_id  INTEGER NOT NULL REFERENCES products(id),
+    product_id  INTEGER REFERENCES products(id),          -- необязателен если используется sort_id
+    sort_id     INTEGER REFERENCES product_sorts(id),     -- сорт из справочника
     qty         NUMERIC(15,3) NOT NULL,
     price       NUMERIC(15,2) DEFAULT 0,
     vat_rate    NUMERIC(5,2)  DEFAULT 20,
-    unit_id     INTEGER REFERENCES units(id),     -- единица для данной позиции накладной
-    country_id  INTEGER REFERENCES countries(id)  -- страна происхождения для данной позиции
+    unit_id     INTEGER REFERENCES units(id),             -- единица для данной позиции накладной
+    country_id  INTEGER REFERENCES countries(id)          -- страна происхождения для данной позиции
 );
 
 -- ── ФИНАНСЫ ───────────────────────────────────────────────────

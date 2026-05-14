@@ -530,27 +530,23 @@ async function editCP(id){const c=await api('/counterparties/'+id);openModal('Р
 async function deleteCP(id){if(!confirm('Деактивировать?'))return;await api('/counterparties/'+id,'DELETE');toast('Деактивирован');loadCP();}
 
 // DOCUMENTS
-function docItemsOptions() {
-  return docProducts.map(p=>`<option value="${p.id}" data-buy="0" data-sell="0">${esc(p.name)} (${p.sku}) — ${p.qty||0} на складе</option>`).join('');
-}
-
-function getProductsForCategory(catId) {
-  if(!catId) return docProducts;
-  return docProducts.filter(p=>p.category_id===catId);
+function getSortsForCategory(catId) {
+  if(!catId) return docAllSorts;
+  return docAllSorts.filter(s=>s.category_id===catId);
 }
 
 function renderDocItems() {
   const tbody = document.getElementById('doc-items-body');
   if(!tbody) return;
   tbody.innerHTML = docItems.map((item,i)=>{
-    const filteredProds = getProductsForCategory(item.category_id||null);
-    const prodOpts = filteredProds.map(p=>`<option value="${p.id}"${p.id===item.product_id?' selected':''}>${esc(p.name)} (${p.sku})</option>`).join('');
+    const filteredSorts = getSortsForCategory(item.category_id||null);
+    const sortOpts = '<option value="">— выберите —</option>'+filteredSorts.map(s=>`<option value="${s.id}"${s.id===item.sort_id?' selected':''}>${esc(s.name)}</option>`).join('');
     const catOpts = '<option value="">— Все —</option>'+docCategories.map(c=>`<option value="${c.id}"${c.id===item.category_id?' selected':''}>${esc(c.name)}</option>`).join('');
     const unitOpts = '<option value="">—</option>'+docUnits.map(u=>`<option value="${u.id}"${u.id===item.unit_id?' selected':''}>${esc(u.short_name)}</option>`).join('');
     const countryOpts = '<option value="">—</option>'+docCountries.map(c=>`<option value="${c.id}"${c.id===item.country_id?' selected':''}>${esc(c.name)}</option>`).join('');
     return `<tr>
       <td style="min-width:110px"><select onchange="onItemCatChange(${i},this)" style="font-size:11px">${catOpts}</select></td>
-      <td style="min-width:160px"><select onchange="onItemProdChange(${i},this)">${prodOpts}</select></td>
+      <td style="min-width:160px"><select onchange="onItemSortChange(${i},this)">${sortOpts}</select></td>
       <td><input type="number" value="${item.qty}" min="0.001" step="0.001" oninput="onItemField(${i},this,'qty')" style="width:70px"></td>
       <td style="min-width:70px"><select onchange="onItemField(${i},this,'unit_id')">${unitOpts}</select></td>
       <td><input type="number" value="${item.price}" min="0" step="0.01" oninput="onItemField(${i},this,'price')" style="width:90px"></td>
@@ -564,12 +560,13 @@ function renderDocItems() {
 
 function onItemCatChange(i, sel) {
   docItems[i].category_id = +sel.value||null;
-  docItems[i].product_id = getProductsForCategory(docItems[i].category_id)[0]?.id||null;
+  const firstSort = getSortsForCategory(docItems[i].category_id)[0];
+  docItems[i].sort_id = firstSort?.id||null;
   renderDocItems();
 }
 
-function onItemProdChange(i, sel) {
-  docItems[i].product_id = +sel.value;
+function onItemSortChange(i, sel) {
+  docItems[i].sort_id = +sel.value||null;
   updateDocTotal();
 }
 
@@ -584,8 +581,7 @@ function onItemField(i, el, field) {
 function removeDocItem(i) { docItems.splice(i,1); renderDocItems(); }
 
 function addDocItem() {
-  if(!docProducts.length) return;
-  docItems.push({product_id: docProducts[0].id, category_id: docProducts[0].category_id||null, qty:1, price:0, vat_rate:20, unit_id:null, country_id:null});
+  docItems.push({sort_id: null, category_id: null, qty:1, price:0, vat_rate:20, unit_id:null, country_id:null});
   renderDocItems();
 }
 
@@ -596,8 +592,8 @@ function updateDocTotal() {
 }
 
 function getDocItemsFromForm() {
-  return docItems.filter(i=>i.product_id&&i.qty>0).map(i=>({
-    product_id: i.product_id, qty: i.qty, price: i.price, vat_rate: i.vat_rate||20,
+  return docItems.filter(i=>i.qty>0).map(i=>({
+    sort_id: i.sort_id||null, qty: i.qty, price: i.price, vat_rate: i.vat_rate||20,
     unit_id: i.unit_id||null, country_id: i.country_id||null
   }));
 }
@@ -667,11 +663,11 @@ async function cancelDoc(id){if(!confirm('Отменить проведение 
 async function deleteDoc(id){if(!confirm('Удалить документ? Это действие необратимо.'))return;await api('/documents/'+id,'DELETE');toast('Документ удалён');loadDocs();}
 
 async function openAddDoc() {
-  const [cps,warehouses,products,categories,units,countries] = await Promise.all([
-    api('/counterparties/'),api('/warehouses/'),api('/products/'),
-    api('/categories/'),api('/units/'),api('/countries/')
+  const [cps,warehouses,categories,units,countries,sorts] = await Promise.all([
+    api('/counterparties/'),api('/warehouses/'),
+    api('/categories/'),api('/units/'),api('/countries/'),api('/sorts/')
   ]);
-  docProducts = products; docCategories = categories; docUnits = units; docCountries = countries;
+  docCategories = categories; docUnits = units; docCountries = countries; docAllSorts = sorts;
   docItems = [];
   openModal('Новая накладная', docFormHeader(cps,warehouses), async()=>{
     const items = getDocItemsFromForm();
@@ -684,14 +680,14 @@ async function openAddDoc() {
 }
 
 async function editDoc(id) {
-  const [doc,cps,warehouses,products,categories,units,countries] = await Promise.all([
-    api('/documents/'+id),api('/counterparties/'),api('/warehouses/'),api('/products/'),
-    api('/categories/'),api('/units/'),api('/countries/')
+  const [doc,cps,warehouses,categories,units,countries,sorts] = await Promise.all([
+    api('/documents/'+id),api('/counterparties/'),api('/warehouses/'),
+    api('/categories/'),api('/units/'),api('/countries/'),api('/sorts/')
   ]);
-  docProducts = products; docCategories = categories; docUnits = units; docCountries = countries;
+  docCategories = categories; docUnits = units; docCountries = countries; docAllSorts = sorts;
   docItems = (doc.items||[]).map(i=>{
-    const prod = products.find(p=>p.id===i.product_id);
-    return {product_id:i.product_id,category_id:prod?.category_id||null,qty:+i.qty,price:+i.price,vat_rate:+i.vat_rate||20,unit_id:i.unit_id||null,country_id:i.country_id||null};
+    const sort = sorts.find(s=>s.id===i.sort_id);
+    return {sort_id:i.sort_id||null,category_id:sort?.category_id||null,qty:+i.qty,price:+i.price,vat_rate:+i.vat_rate||20,unit_id:i.unit_id||null,country_id:i.country_id||null};
   });
   openModal('Редактировать накладную',
     docFormHeader(cps,warehouses,doc.doc_number,doc.doc_type,doc.doc_date,doc.counterparty_id,doc.warehouse_id,doc.notes||''),
