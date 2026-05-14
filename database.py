@@ -53,41 +53,50 @@ def run_migrations():
     except Exception as e:
         logger.warning("Migration 002 skipped or failed (may be harmless): %s", e)
 
-    try:
-        with engine.connect() as conn:
-            conn.execute(text(
-                "ALTER TABLE product_categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
-            ))
-            conn.execute(text(
-                "ALTER TABLE units ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
-            ))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS product_sorts (
+    for _sql, _label in [
+        (
+            "ALTER TABLE product_categories ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+            "003a product_categories.is_active",
+        ),
+        (
+            "ALTER TABLE units ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
+            "003b units.is_active",
+        ),
+        (
+            """CREATE TABLE IF NOT EXISTS product_sorts (
                     id SERIAL PRIMARY KEY,
                     name VARCHAR(100) NOT NULL,
                     category_id INTEGER NOT NULL REFERENCES product_categories(id),
                     is_active BOOLEAN NOT NULL DEFAULT TRUE,
                     created_at TIMESTAMPTZ DEFAULT NOW()
-                )
-            """))
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS countries (
+                )""",
+            "003c product_sorts table",
+        ),
+        (
+            """CREATE TABLE IF NOT EXISTS countries (
                     id SERIAL PRIMARY KEY,
                     name VARCHAR(100) NOT NULL UNIQUE,
                     is_active BOOLEAN NOT NULL DEFAULT TRUE,
                     created_at TIMESTAMPTZ DEFAULT NOW()
-                )
-            """))
-            conn.execute(text(
-                "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id)"
-            ))
-            conn.execute(text(
-                "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS country_id INTEGER REFERENCES countries(id)"
-            ))
-            conn.commit()
-        logger.info("Migration 003 (catalog tables) applied successfully")
-    except Exception as e:
-        logger.warning("Migration 003 skipped or failed (may be harmless): %s", e)
+                )""",
+            "003d countries table",
+        ),
+        (
+            "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS unit_id INTEGER REFERENCES units(id)",
+            "003e document_items.unit_id",
+        ),
+        (
+            "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS country_id INTEGER REFERENCES countries(id)",
+            "003f document_items.country_id",
+        ),
+    ]:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(_sql))
+                conn.commit()
+            logger.info("Migration %s applied successfully", _label)
+        except Exception as e:
+            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
 
     try:
         with engine.connect() as conn:
