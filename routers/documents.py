@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -6,32 +7,13 @@ from database import get_db
 from models import Document, DocumentItem, Counterparty, User
 from schemas import DocumentCreate, DocumentUpdate, DocumentOut, MessageResponse
 from routers.auth import get_current_user, require_role
+from routers.utils import RECALC_SQL
 from typing import List, Optional
 from datetime import date, datetime, timezone
 
-router = APIRouter()
+logger = logging.getLogger(__name__)
 
-RECALC_SQL = """
-    INSERT INTO stock (sort_id, warehouse_id, qty)
-    SELECT
-        di.sort_id,
-        d.warehouse_id,
-        SUM(di.qty * CASE d.doc_type
-            WHEN 'receipt'    THEN  1
-            WHEN 'shipment'   THEN -1
-            WHEN 'return_in'  THEN  1
-            WHEN 'return_out' THEN -1
-            WHEN 'writeoff'   THEN -1
-            ELSE 0
-        END)
-    FROM document_items di
-    JOIN documents d ON d.id = di.document_id
-    WHERE d.status = 'confirmed'
-      AND d.warehouse_id IS NOT NULL
-      AND di.sort_id IS NOT NULL
-    GROUP BY di.sort_id, d.warehouse_id
-    ON CONFLICT (sort_id, warehouse_id) DO UPDATE SET qty = EXCLUDED.qty
-"""
+router = APIRouter()
 
 ITEMS_SQL = """
     SELECT di.*,
@@ -231,9 +213,6 @@ def confirm_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "warehouse"))
 ):
-    import logging
-    logger = logging.getLogger(__name__)
-
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(404, "Документ не найден")

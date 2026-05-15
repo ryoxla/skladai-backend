@@ -1,6 +1,6 @@
 -- schema_clean.sql — полная схема БД складAI (актуальная)
--- Обновлено: включает справочники сортов, стран, is_active для категорий/единиц,
--- а также unit_id/country_id в document_items
+-- Обновлено: удалена таблица products, stock использует sort_id,
+-- document_items без product_id, добавлены актуальные views
 
 -- ── ПОЛЬЗОВАТЕЛИ ─────────────────────────────────────────────
 
@@ -100,32 +100,15 @@ CREATE TABLE IF NOT EXISTS counterparties (
     updated_at   TIMESTAMPTZ  DEFAULT NOW()
 );
 
--- ── ТОВАРЫ ────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS products (
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(255) NOT NULL,
-    sku         VARCHAR(50)  NOT NULL UNIQUE,
-    sort        VARCHAR(100),
-    country     VARCHAR(100),
-    category_id INTEGER REFERENCES product_categories(id),
-    unit_id     INTEGER      NOT NULL REFERENCES units(id),
-    vat_rate    NUMERIC(5,2) DEFAULT 20,
-    min_qty     NUMERIC(15,3) DEFAULT 0,
-    description TEXT,
-    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ  DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  DEFAULT NOW()
-);
-
 -- ── ОСТАТКИ ───────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS stock (
     id           SERIAL PRIMARY KEY,
-    product_id   INTEGER NOT NULL REFERENCES products(id),
-    warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+    sort_id      INTEGER       NOT NULL REFERENCES product_sorts(id),
+    warehouse_id INTEGER       NOT NULL REFERENCES warehouses(id),
     qty          NUMERIC(15,3) DEFAULT 0,
-    updated_at   TIMESTAMPTZ DEFAULT NOW()
+    updated_at   TIMESTAMPTZ   DEFAULT NOW(),
+    UNIQUE (sort_id, warehouse_id)
 );
 
 -- ── ДОКУМЕНТЫ ─────────────────────────────────────────────────
@@ -153,13 +136,12 @@ CREATE TABLE IF NOT EXISTS documents (
 CREATE TABLE IF NOT EXISTS document_items (
     id          SERIAL PRIMARY KEY,
     document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    product_id  INTEGER REFERENCES products(id),          -- необязателен если используется sort_id
-    sort_id     INTEGER REFERENCES product_sorts(id),     -- сорт из справочника
+    sort_id     INTEGER REFERENCES product_sorts(id),
     qty         NUMERIC(15,3) NOT NULL,
     price       NUMERIC(15,2) DEFAULT 0,
     vat_rate    NUMERIC(5,2)  DEFAULT 20,
-    unit_id     INTEGER REFERENCES units(id),             -- единица для данной позиции накладной
-    country_id  INTEGER REFERENCES countries(id)          -- страна происхождения для данной позиции
+    unit_id     INTEGER REFERENCES units(id),
+    country_id  INTEGER REFERENCES countries(id)
 );
 
 -- ── ФИНАНСЫ ───────────────────────────────────────────────────
@@ -179,3 +161,45 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_by      INTEGER,
     created_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ── ПРЕДСТАВЛЕНИЯ (VIEWS) ─────────────────────────────────────
+
+CREATE OR REPLACE VIEW v_stock_alerts AS
+SELECT
+    s.id,
+    s.sort_id,
+    s.warehouse_id,
+    ps.name AS sort_name,
+    pc.name AS category_name,
+    w.name  AS warehouse_name,
+    s.qty,
+    CASE
+        WHEN s.qty <= 0 THEN 'out_of_stock'
+        ELSE 'ok'
+    END AS alert_level,
+    s.updated_at
+FROM stock s
+JOIN product_sorts ps      ON ps.id = s.sort_id
+JOIN product_categories pc ON pc.id = ps.category_id
+JOIN warehouses w          ON w.id  = s.warehouse_id
+WHERE ps.is_active = true;
+
+CREATE OR REPLACE VIEW v_counterparty_balances AS
+SELECT
+    id,
+    name,
+    type,
+    balance,
+    is_active
+FROM counterparties
+WHERE is_active = true;
+
+CREATE OR REPLACE VIEW v_cashflow_monthly AS
+SELECT
+    DATE_TRUNC('month', txn_date) AS month,
+    SUM(CASE WHEN txn_type = 'income'  THEN amount ELSE 0 END) AS income,
+    SUM(CASE WHEN txn_type = 'expense' THEN amount ELSE 0 END) AS expense
+FROM transactions
+WHERE status = 'confirmed'
+GROUP BY 1
+ORDER BY 1 DESC;

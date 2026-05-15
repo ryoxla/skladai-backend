@@ -57,8 +57,7 @@ def create_category(
 ):
     cat = ProductCategory(name=data.name, is_active=data.is_active)
     db.add(cat)
-    db.commit()
-    db.refresh(cat)
+    db.flush()
     return {"message": "Товар создан", "id": cat.id}
 
 
