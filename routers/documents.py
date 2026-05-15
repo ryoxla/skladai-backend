@@ -194,6 +194,47 @@ def update_document(
 
     db.flush()
 
+    if doc.doc_type in ('shipment', 'return_out', 'writeoff') and data.items is not None:
+        items = db.query(DocumentItem).filter(
+            DocumentItem.document_id == doc_id
+        ).all()
+        errors = []
+        for item in items:
+            if not item.batch_id:
+                continue
+            batch = db.query(StockBatch).filter(
+                StockBatch.id == item.batch_id
+            ).first()
+            if not batch:
+                continue
+            other_shipments_qty = db.execute(text("""
+                SELECT COALESCE(SUM(di.qty), 0)
+                FROM document_items di
+                JOIN documents d ON d.id = di.document_id
+                WHERE di.batch_id = :batch_id
+                  AND d.status = 'confirmed'
+                  AND di.document_id != :doc_id
+            """), {"batch_id": item.batch_id, "doc_id": doc_id}).scalar() or Decimal("0")
+            available = batch.qty_in - other_shipments_qty
+            if item.qty > available:
+                cat = db.query(ProductCategory).filter(
+                    ProductCategory.id == batch.category_id
+                ).first()
+                cat_name = cat.name if cat else str(batch.category_id)
+                sort_name = ""
+                if batch.sort_id:
+                    s = db.query(ProductSort).filter(
+                        ProductSort.id == batch.sort_id
+                    ).first()
+                    sort_name = f" ({s.name})" if s else ""
+                errors.append(
+                    f"{cat_name}{sort_name}: запрошено {item.qty}, доступно {available}"
+                )
+        if errors:
+            raise HTTPException(400,
+                "Недостаточно остатков: " + "; ".join(errors)
+            )
+
     # Пересчёт остатков
     recalculate_stock(db)
 

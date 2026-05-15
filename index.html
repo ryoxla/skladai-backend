@@ -760,9 +760,36 @@ async function loadDocs(doc_type=null) {
 }
 
 function filterDocs(type,btn){document.querySelectorAll('#page-documents .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadDocs(type);}
-async function confirmDoc(id){if(!confirm('Провести документ?'))return;await api('/documents/'+id+'/confirm','PUT');toast('Документ проведён');loadDocs();}
-async function cancelDoc(id){if(!confirm('Отменить проведение документа?'))return;await api('/documents/'+id+'/cancel','PUT');toast('Проведение отменено, документ возвращён в статус "Не проведена"');loadDocs();}
-async function deleteDoc(id){if(!confirm('Удалить документ? Это действие необратимо.'))return;await api('/documents/'+id,'DELETE');toast('Документ удалён');loadDocs();}
+async function confirmDoc(id) {
+    if (!confirm('Провести документ?')) return;
+    try {
+        await api('/documents/' + id + '/confirm', 'PUT');
+        toast('Документ проведён');
+        loadDocs();
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+async function cancelDoc(id) {
+    if (!confirm('Отменить проведение документа?')) return;
+    try {
+        await api('/documents/' + id + '/cancel', 'PUT');
+        toast('Проведение отменено, документ возвращён в статус "Не проведена"');
+        loadDocs();
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
+async function deleteDoc(id) {
+    if (!confirm('Удалить документ? Это действие необратимо.')) return;
+    try {
+        await api('/documents/' + id, 'DELETE');
+        toast('Документ удалён');
+        loadDocs();
+    } catch(e) {
+        toast(e.message, 'error');
+    }
+}
 
 async function openAddDoc() {
   const [cps,warehouses,categories,units,countries,sorts,stock] = await Promise.all([
