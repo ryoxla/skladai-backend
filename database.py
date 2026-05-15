@@ -164,6 +164,76 @@ def run_migrations():
         except Exception as e:
             logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
 
+    for _sql, _label in [
+        (
+            "DROP VIEW IF EXISTS v_stock_alerts",
+            "008a drop v_stock_alerts",
+        ),
+        (
+            "DROP TABLE IF EXISTS stock CASCADE",
+            "008b drop stock",
+        ),
+        (
+            """CREATE TABLE IF NOT EXISTS stock (
+                id           SERIAL PRIMARY KEY,
+                sort_id      INTEGER NOT NULL REFERENCES product_sorts(id),
+                warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+                qty          NUMERIC(15,3) DEFAULT 0,
+                updated_at   TIMESTAMPTZ DEFAULT NOW(),
+                UNIQUE(sort_id, warehouse_id)
+            )""",
+            "008c create stock",
+        ),
+        (
+            "ALTER TABLE document_items DROP COLUMN IF EXISTS product_id",
+            "008d drop document_items.product_id",
+        ),
+        (
+            "ALTER TABLE product_sorts DROP COLUMN IF EXISTS product_id",
+            "008e drop product_sorts.product_id",
+        ),
+        (
+            "DROP TABLE IF EXISTS products CASCADE",
+            "008f drop products",
+        ),
+        (
+            """CREATE OR REPLACE VIEW v_stock_alerts AS
+            SELECT
+                s.id,
+                s.sort_id,
+                s.warehouse_id,
+                ps.name AS sort_name,
+                pc.name AS category_name,
+                w.name  AS warehouse_name,
+                s.qty,
+                CASE
+                    WHEN s.qty <= 0 THEN 'out_of_stock'
+                    ELSE 'ok'
+                END AS alert_level,
+                s.updated_at
+            FROM stock s
+            JOIN product_sorts ps      ON ps.id = s.sort_id
+            JOIN product_categories pc ON pc.id = ps.category_id
+            JOIN warehouses w          ON w.id  = s.warehouse_id
+            WHERE ps.is_active = true""",
+            "008g v_stock_alerts",
+        ),
+        (
+            """CREATE OR REPLACE VIEW v_counterparty_balances AS
+            SELECT id, name, type, balance, is_active
+            FROM counterparties
+            WHERE is_active = true""",
+            "008h v_counterparty_balances",
+        ),
+    ]:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(_sql))
+                conn.commit()
+            logger.info("Migration %s applied successfully", _label)
+        except Exception as e:
+            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
+
     try:
         with engine.connect() as conn:
             conn.execute(text("""
