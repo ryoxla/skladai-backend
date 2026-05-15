@@ -57,7 +57,6 @@ class ProductSort(Base):
     id          = Column(Integer, primary_key=True)
     name        = Column(String(100), nullable=False)
     category_id = Column(Integer, ForeignKey("product_categories.id"), nullable=False)
-    product_id  = Column(Integer, ForeignKey("products.id"))
     is_active   = Column(Boolean, default=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
     category    = relationship("ProductCategory", back_populates="sorts")
@@ -110,28 +109,10 @@ class Counterparty(Base):
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
     updated_at   = Column(DateTime(timezone=True), server_default=func.now())
 
-# ── ТОВАРЫ ────────────────────────────────────────────────────
-
-class Product(Base):
-    __tablename__ = "products"
-    id          = Column(Integer, primary_key=True)
-    name        = Column(String(255), nullable=False)
-    sku         = Column(String(50), nullable=False, unique=True)
-    sort        = Column(String(100))
-    country     = Column(String(100))
-    category_id = Column(Integer, ForeignKey("product_categories.id"))
-    unit_id     = Column(Integer, ForeignKey("units.id"), nullable=False)
-    vat_rate    = Column(Numeric(5, 2), default=20)
-    min_qty     = Column(Numeric(15, 3), default=0)
-    description = Column(Text)
-    is_active   = Column(Boolean, default=True)
-    created_at  = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at  = Column(DateTime(timezone=True), server_default=func.now())
-
 class Stock(Base):
     __tablename__ = "stock"
     id           = Column(Integer, primary_key=True)
-    product_id   = Column(Integer, ForeignKey("products.id"), nullable=False)
+    sort_id      = Column(Integer, ForeignKey("product_sorts.id"), nullable=False)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
     qty          = Column(Numeric(15, 3), default=0)
     updated_at   = Column(DateTime(timezone=True), server_default=func.now())
@@ -161,7 +142,6 @@ class DocumentItem(Base):
     __tablename__ = "document_items"
     id          = Column(Integer, primary_key=True)
     document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
-    product_id  = Column(Integer, ForeignKey("products.id"))
     sort_id     = Column(Integer, ForeignKey("product_sorts.id"))
     qty         = Column(Numeric(15, 3), nullable=False)
     price       = Column(Numeric(15, 2), default=0)

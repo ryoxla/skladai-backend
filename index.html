@@ -178,12 +178,6 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     </div>
     <div class="page" id="page-stock">
       <div class="card">
-        <div class="filters">
-          <button class="filter-btn active" onclick="filterStock('all',this)">Все</button>
-          <button class="filter-btn" onclick="filterStock('low_stock',this)">Мало</button>
-          <button class="filter-btn" onclick="filterStock('out_of_stock',this)">Нет на складе</button>
-          <button class="filter-btn" onclick="filterStock('ok',this)">В норме</button>
-        </div>
         <div id="stock-table"><div class="loading"><div class="spinner"></div></div></div>
       </div>
     </div>
@@ -250,10 +244,9 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
 <script>
 const API = 'https://skladai-backend-production.up.railway.app/api';
 let currentPage = 'dashboard';
-let allProducts = [], allCP = [], allDocs = [], allTxns = [], allStock = [];
+let allCP = [], allDocs = [], allTxns = [], allStock = [];
 let modalSaveFn = null;
 let currentUser = null;
-let docProducts = [];
 let docItems = [];
 let docCategories = [], docUnits = [], docCountries = [], docAllSorts = [];
 let currentCatalogTab = 'categories';
@@ -286,7 +279,7 @@ function toast(msg, type='success') {
 }
 
 function showPage(name, el) {
-  document.getElementById('recalc-btn').style.display = (name==='stock'||name==='documents'||name==='products') ? '' : 'none';
+  document.getElementById('recalc-btn').style.display = (name==='stock'||name==='documents') ? '' : 'none';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -302,7 +295,6 @@ function refreshCurrentPage() { loadPage(currentPage); }
 
 function loadPage(name) {
   if(name==='dashboard') loadDashboard();
-  else if(name==='products') loadProducts();
   else if(name==='stock') loadStock();
   else if(name==='counterparties') loadCP();
   else if(name==='documents') loadDocs();
@@ -313,7 +305,7 @@ function loadPage(name) {
 }
 
 function openAddModal() {
-  const fns = {products:openAddProduct,counterparties:openAddCP,documents:openAddDoc,finance:openAddTxn,accounts:openAddAccount,users:openAddUser,catalogs:openAddCatalogItem};
+  const fns = {counterparties:openAddCP,documents:openAddDoc,finance:openAddTxn,accounts:openAddAccount,users:openAddUser,catalogs:openAddCatalogItem};
   if(fns[currentPage]) fns[currentPage]();
 }
 
@@ -379,131 +371,33 @@ function updateUserInfo() {
 // DASHBOARD
 async function loadDashboard() {
   try {
-    const [accounts, stockAlerts, cpBalances, stockVal] = await Promise.all([
-      api('/accounts/'), api('/stock/alerts'), api('/counterparties/balances'), api('/stock/value')
+    const [accounts, stockAlerts, cpBalances, allStockItems] = await Promise.all([
+      api('/accounts/'), api('/stock/alerts'), api('/counterparties/balances'), api('/stock/')
     ]);
     const cash = accounts.reduce((s,a)=>s+parseFloat(a.balance||0),0);
     const debt = cpBalances.filter(c=>c.balance<0&&c.type==='client').reduce((s,c)=>s+Math.abs(c.balance),0);
     document.getElementById('kpi-grid').innerHTML = `
       <div class="kpi-card blue"><div class="kpi-icon">💵</div><div class="kpi-label">Касса / Счета</div><div class="kpi-value">${fmt(cash)}</div><div class="kpi-sub">${accounts.length} счёт(ов)</div></div>
-      <div class="kpi-card green"><div class="kpi-icon">📦</div><div class="kpi-label">Стоимость склада</div><div class="kpi-value">${fmt(stockVal.value_sell)}</div><div class="kpi-sub">${stockVal.products_count} позиций</div></div>
+      <div class="kpi-card green"><div class="kpi-icon">📦</div><div class="kpi-label">Позиций на складе</div><div class="kpi-value">${allStockItems.length}</div><div class="kpi-sub">${allStockItems.filter(s=>parseFloat(s.qty)>0).length} с остатком</div></div>
       <div class="kpi-card red"><div class="kpi-icon">👥</div><div class="kpi-label">Дебиторский долг</div><div class="kpi-value">${fmt(debt)}</div><div class="kpi-sub">${cpBalances.filter(c=>c.balance<0&&c.type==='client').length} клиентов</div></div>
-      <div class="kpi-card purple"><div class="kpi-icon">⚠</div><div class="kpi-label">Критических остатков</div><div class="kpi-value">${stockAlerts.length}</div><div class="kpi-sub">позиций</div></div>`;
-    document.getElementById('alerts-table').innerHTML = stockAlerts.length===0 ? '<div class="empty">✅ Все остатки в норме</div>'
-      : `<table><thead><tr><th>Товар</th><th>Склад</th><th>Остаток</th><th>Минимум</th></tr></thead><tbody>${stockAlerts.map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(s.warehouse)}</td><td><span class="badge ${s.alert_level==='out_of_stock'?'badge-red':'badge-yellow'}">${s.qty} ${esc(s.unit)}</span></td><td class="mono">${s.min_qty}</td></tr>`).join('')}</tbody></table>`;
+      <div class="kpi-card purple"><div class="kpi-icon">⚠</div><div class="kpi-label">Нет на складе</div><div class="kpi-value">${stockAlerts.length}</div><div class="kpi-sub">позиций</div></div>`;
+    document.getElementById('alerts-table').innerHTML = stockAlerts.length===0 ? '<div class="empty">✅ Все остатки пополнены</div>'
+      : `<table><thead><tr><th>Товар</th><th>Сорт</th><th>Склад</th><th>Остаток</th></tr></thead><tbody>${stockAlerts.map(s=>`<tr><td>${esc(s.category_name)}</td><td>${esc(s.sort_name)}</td><td>${esc(s.warehouse)}</td><td><span class="badge badge-red">${s.qty}</span></td></tr>`).join('')}</tbody></table>`;
     const debtors = cpBalances.filter(c=>c.balance<0).sort((a,b)=>a.balance-b.balance).slice(0,6);
     document.getElementById('debtors-table').innerHTML = debtors.length===0 ? '<div class="empty">✅ Задолженностей нет</div>'
       : `<table><thead><tr><th>Контрагент</th><th>Тип</th><th style="text-align:right">Долг</th></tr></thead><tbody>${debtors.map(c=>`<tr><td>${esc(c.name)}</td><td><span class="badge ${c.type==='client'?'badge-blue':'badge-yellow'}">${c.type==='client'?'Клиент':'Поставщик'}</span></td><td style="text-align:right" class="amount-neg">${fmt(Math.abs(c.balance))}</td></tr>`).join('')}</tbody></table>`;
   } catch(e) { toast('Ошибка дашборда: '+e.message,'error'); }
 }
 
-// PRODUCTS
-async function loadProducts() {
-  document.getElementById('products-table').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-  try { allProducts = await api('/products/'); renderProducts(allProducts); }
-  catch(e) { toast(e.message,'error'); }
-}
-function renderProducts(list) {
-  if(!list.length){document.getElementById('products-table').innerHTML='<div class="empty">Товаров нет</div>';return;}
-  document.getElementById('products-table').innerHTML = `<table>
-    <thead><tr><th>Артикул</th><th>Наименование</th><th>Сорт</th><th>Страна</th><th>Ед.</th><th style="text-align:center">Остаток</th><th>Статус</th><th></th></tr></thead>
-    <tbody>${list.map(p=>`<tr>
-      <td class="mono">${esc(p.sku)}</td>
-      <td><strong>${esc(p.name)}</strong></td>
-      <td>${esc(p.sort||'—')}</td>
-      <td>${esc(p.country||'—')}</td>
-      <td class="mono">${esc(p.unit_name||'')}</td>
-      <td style="text-align:center"><span class="badge ${p.alert==='out_of_stock'?'badge-red':p.alert==='low_stock'?'badge-yellow':'badge-green'}">${p.qty||0}</span></td>
-      <td><span class="badge ${p.alert==='out_of_stock'?'badge-red':p.alert==='low_stock'?'badge-yellow':'badge-green'}">${p.alert==='out_of_stock'?'Нет':p.alert==='low_stock'?'Мало':'Норма'}</span></td>
-      <td><button class="btn btn-ghost btn-sm" onclick="editProduct(${p.id})">✏</button> <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">✕</button></td>
-    </tr>`).join('')}</tbody></table>`;
-}
-function filterProducts(q){renderProducts(allProducts.filter(p=>p.name.toLowerCase().includes(q.toLowerCase())||p.sku.toLowerCase().includes(q.toLowerCase())));}
-
-function productForm(p={}, units=[], categories=[], sorts=[]) {
-  const catOpts = categories.map(c=>`<option value="${c.id}"${c.id===p.category_id?' selected':''}>${esc(c.name)}</option>`).join('');
-  const sortOpts = sorts.filter(s=>!p.category_id||s.category_id===p.category_id)
-    .map(s=>`<option value="${esc(s.name)}"${s.name===p.sort?' selected':''}>${esc(s.name)}</option>`).join('');
-  return `
-    <div class="form-row">
-      <div class="form-group"><label>Наименование *</label><input id="f-name" value="${esc(p.name||'')}" placeholder="Яблоки Голден"></div>
-      <div class="form-group"><label>Артикул *</label><input id="f-sku" value="${esc(p.sku||'')}" placeholder="YBL-001"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Товар</label>
-        <select id="f-category" onchange="onProductCategoryChange(this,${JSON.stringify(sorts).replace(/"/g,'&quot;')})">
-          <option value="">— выберите —</option>${catOpts}
-        </select>
-      </div>
-      <div class="form-group"><label>Сорт</label>
-        <select id="f-sort">
-          <option value="">— выберите —</option>${sortOpts}
-        </select>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Единица измерения *</label><select id="f-unit">${units.map(u=>`<option value="${u.id}"${u.id===p.unit_id?' selected':''}>${u.name} (${u.short_name})</option>`).join('')}</select></div>
-      <div class="form-group"><label>Минимальный остаток</label><input id="f-minqty" type="number" value="${p.min_qty||0}"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>НДС %</label><input id="f-vat" type="number" value="${p.vat_rate||20}"></div>
-      <div class="form-group"><label>Описание</label><input id="f-desc" value="${esc(p.description||'')}" placeholder="Необязательно"></div>
-    </div>`;
-}
-
-function onProductCategoryChange(sel, allSorts) {
-  const catId = +sel.value;
-  const sortSel = document.getElementById('f-sort');
-  if(!sortSel) return;
-  const filtered = catId ? allSorts.filter(s=>s.category_id===catId) : allSorts;
-  sortSel.innerHTML = '<option value="">— выберите —</option>' +
-    filtered.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
-}
-
-function getProductData() {
-  const catSel = document.getElementById('f-category');
-  const sortSel = document.getElementById('f-sort');
-  return {
-    name: document.getElementById('f-name').value,
-    sku: document.getElementById('f-sku').value,
-    category_id: catSel&&+catSel.value||null,
-    sort: sortSel&&sortSel.value||null,
-    unit_id: +document.getElementById('f-unit').value,
-    min_qty: +document.getElementById('f-minqty').value||0,
-    vat_rate: +document.getElementById('f-vat').value||20,
-    description: document.getElementById('f-desc').value||null
-  };
-}
-
-async function openAddProduct() {
-  const [units, categories, sorts] = await Promise.all([api('/units/'), api('/categories/'), api('/sorts/')]);
-  openModal('Новый товар', productForm({}, units, categories, sorts), async()=>{
-    const data = getProductData();
-    if(!data.name||!data.sku) throw new Error('Заполните название и артикул');
-    await api('/products/','POST',data); toast('Товар добавлен'); loadProducts();
-  });
-}
-
-async function editProduct(id) {
-  const [p, units, categories, sorts] = await Promise.all([api('/products/'+id), api('/units/'), api('/categories/'), api('/sorts/')]);
-  openModal('Редактировать товар', productForm(p, units, categories, sorts), async()=>{
-    const data = getProductData();
-    await api('/products/'+id,'PUT',data); toast('Товар обновлён'); loadProducts();
-  });
-}
-
-async function deleteProduct(id){if(!confirm('Деактивировать товар?'))return;await api('/products/'+id,'DELETE');toast('Деактивирован');loadProducts();}
-
 // STOCK
-async function loadStock(alert_level=null) {
+async function loadStock() {
   document.getElementById('stock-table').innerHTML='<div class="loading"><div class="spinner"></div></div>';
   try {
-    allStock = await api('/stock/'+(alert_level&&alert_level!=='all'?'?alert_level='+alert_level:''));
+    allStock = await api('/stock/');
     document.getElementById('stock-table').innerHTML = !allStock.length ? '<div class="empty">Остатков нет</div>'
-      : `<table><thead><tr><th>Товар</th><th>Склад</th><th>Ед.</th><th style="text-align:center">Остаток</th><th>Минимум</th><th>Статус</th></tr></thead><tbody>${allStock.map(s=>`<tr><td><strong>${esc(s.name)}</strong></td><td>${esc(s.warehouse)}</td><td class="mono">${esc(s.unit)}</td><td style="text-align:center"><strong class="${s.alert_level==='out_of_stock'?'amount-neg':s.alert_level==='low_stock'?'':'amount-pos'}">${s.qty}</strong></td><td class="mono">${s.min_qty}</td><td><span class="badge ${s.alert_level==='out_of_stock'?'badge-red':s.alert_level==='low_stock'?'badge-yellow':'badge-green'}">${s.alert_level==='out_of_stock'?'Нет':s.alert_level==='low_stock'?'Мало':'В норме'}</span></td></tr>`).join('')}</tbody></table>`;
+      : `<table><thead><tr><th>Товар</th><th>Сорт</th><th>Склад</th><th style="text-align:center">Остаток</th></tr></thead><tbody>${allStock.map(s=>`<tr><td>${esc(s.category_name)}</td><td><strong>${esc(s.sort_name)}</strong></td><td>${esc(s.warehouse)}</td><td style="text-align:center"><strong class="${parseFloat(s.qty)<=0?'amount-neg':'amount-pos'}">${s.qty}</strong></td></tr>`).join('')}</tbody></table>`;
   } catch(e){toast(e.message,'error');}
 }
-function filterStock(level,btn){document.querySelectorAll('#page-stock .filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');loadStock(level);}
 async function recalculateStock() {
   if(!confirm('Пересчитать остатки по всем проведённым накладным?')) return;
   try { await api('/stock/recalculate','POST'); toast('Остатки пересчитаны'); loadPage(currentPage); }

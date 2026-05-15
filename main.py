@@ -11,7 +11,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from routers import products, counterparties, documents, transactions, stock, accounts, warehouses, units, auth
+from routers import counterparties, documents, transactions, stock, accounts, warehouses, units, auth
 from routers import settings as settings_router
 from routers import categories, sorts, countries
 from database import run_migrations
@@ -60,7 +60,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(auth.router,           prefix="/api/auth",           tags=["Auth"])
-app.include_router(products.router,       prefix="/api/products",       tags=["Tovary"])
 app.include_router(counterparties.router, prefix="/api/counterparties", tags=["Kontragenty"])
 app.include_router(documents.router,      prefix="/api/documents",      tags=["Dokumenty"])
 app.include_router(transactions.router,   prefix="/api/transactions",   tags=["Finansy"])
