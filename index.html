@@ -113,8 +113,8 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
     <div style="margin-bottom:16px"><label style="display:block;font-size:11px;font-weight:700;color:#6b8299;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Логин</label>
     <input id="login-username" style="width:100%;background:#131a24;border:1px solid #243447;color:#c9d6e3;border-radius:8px;padding:10px 14px;font-family:'Manrope',sans-serif;font-size:14px;outline:none" placeholder="admin"></div>
     <div style="margin-bottom:24px"><label style="display:block;font-size:11px;font-weight:700;color:#6b8299;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Пароль</label>
-    <input id="login-password" type="password" style="width:100%;background:#131a24;border:1px solid #243447;color:#c9d6e3;border-radius:8px;padding:10px 14px;font-family:'Manrope',sans-serif;font-size:14px;outline:none" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button onclick="doLogin()" style="width:100%;background:#00d4ff;color:#000;border:none;border-radius:8px;padding:12px;font-family:'Manrope',sans-serif;font-weight:700;font-size:14px;cursor:pointer">Войти</button>
+    <input id="login-password" type="password" style="width:100%;background:#131a24;border:1px solid #243447;color:#c9d6e3;border-radius:8px;padding:10px 14px;font-family:'Manrope',sans-serif;font-size:14px;outline:none" placeholder="••••••••"></div>
+    <button id="login-btn" style="width:100%;background:#00d4ff;color:#000;border:none;border-radius:8px;padding:12px;font-family:'Manrope',sans-serif;font-weight:700;font-size:14px;cursor:pointer">Войти</button>
   </div>
 </div>
 
@@ -363,6 +363,8 @@ async function doLogin() {
     loadDashboard();
   } catch(e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
 }
+document.getElementById('login-password').addEventListener('keydown', function(e) { if(e.key==='Enter') doLogin(); });
+document.getElementById('login-btn').addEventListener('click', doLogin);
 function logout() { clearToken(); currentUser = null; showLogin(); }
 function updateUserInfo() {
   if(!currentUser) return;
