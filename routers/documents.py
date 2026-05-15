@@ -232,6 +232,9 @@ def confirm_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin", "manager", "warehouse"))
 ):
+    import logging
+    logger = logging.getLogger(__name__)
+
     doc = db.query(Document).filter(Document.id == doc_id).first()
     if not doc:
         raise HTTPException(404, "Документ не найден")
@@ -239,13 +242,27 @@ def confirm_document(
         raise HTTPException(400, "Документ уже проведён")
     if doc.status == "cancelled":
         raise HTTPException(400, "Нельзя провести отменённый документ")
-    doc.status = "confirmed"
-    doc.confirmed_at = datetime.now(timezone.utc)
-    db.flush()
 
-    recalculate_stock(db)
-    if doc.counterparty_id:
-        recalculate_counterparty_balance(db, doc.counterparty_id)
+    try:
+        doc.status = "confirmed"
+        doc.confirmed_at = datetime.now(timezone.utc)
+        db.flush()
+    except Exception as e:
+        logger.error("confirm_document flush error doc_id=%s: %s", doc_id, e, exc_info=True)
+        raise HTTPException(500, f"Ошибка при сохранении статуса документа: {e}")
+
+    try:
+        recalculate_stock(db)
+    except Exception as e:
+        logger.error("confirm_document recalculate_stock error doc_id=%s: %s", doc_id, e, exc_info=True)
+        raise HTTPException(500, f"Ошибка пересчёта остатков: {e}")
+
+    try:
+        if doc.counterparty_id:
+            recalculate_counterparty_balance(db, doc.counterparty_id)
+    except Exception as e:
+        logger.error("confirm_document balance error doc_id=%s cp_id=%s: %s", doc_id, doc.counterparty_id, e, exc_info=True)
+        raise HTTPException(500, f"Ошибка пересчёта баланса контрагента: {e}")
 
     return {"message": "Документ проведён", "id": doc_id}
 
