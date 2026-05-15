@@ -66,7 +66,7 @@ def create_sort(
     cat = db.query(ProductCategory).filter(ProductCategory.id == data.category_id).first()
     if not cat:
         raise HTTPException(404, "Товар не найден")
-    s = ProductSort(name=data.name, category_id=data.category_id, is_active=data.is_active)
+    s = ProductSort(name=data.name, category_id=data.category_id, product_id=data.product_id, is_active=data.is_active)
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -88,6 +88,7 @@ def update_sort(
         raise HTTPException(404, "Товар не найден")
     s.name = data.name
     s.category_id = data.category_id
+    s.product_id = data.product_id
     s.is_active = data.is_active
     return {"message": "Сорт обновлён", "id": sort_id}
 

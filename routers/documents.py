@@ -14,7 +14,7 @@ router = APIRouter()
 RECALC_SQL = """
     INSERT INTO stock (product_id, warehouse_id, qty)
     SELECT
-        di.product_id,
+        COALESCE(di.product_id, ps.product_id) AS product_id,
         d.warehouse_id,
         SUM(di.qty * CASE d.doc_type
             WHEN 'receipt'    THEN 1
@@ -26,10 +26,11 @@ RECALC_SQL = """
         END)
     FROM document_items di
     JOIN documents d ON d.id = di.document_id
+    LEFT JOIN product_sorts ps ON ps.id = di.sort_id AND di.product_id IS NULL
     WHERE d.status = 'confirmed'
       AND d.warehouse_id IS NOT NULL
-      AND di.product_id IS NOT NULL
-    GROUP BY di.product_id, d.warehouse_id
+      AND COALESCE(di.product_id, ps.product_id) IS NOT NULL
+    GROUP BY COALESCE(di.product_id, ps.product_id), d.warehouse_id
 """
 
 ITEMS_SQL = """

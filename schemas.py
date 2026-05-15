@@ -34,6 +34,7 @@ class ProductCategoryOut(ProductCategoryBase):
 class ProductSortBase(BaseModel):
     name: str
     category_id: int
+    product_id: Optional[int] = None
     is_active: bool = True
 
 class ProductSortCreate(ProductSortBase): pass
