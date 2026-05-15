@@ -395,7 +395,7 @@ async function loadStock() {
   try {
     allStock = await api('/stock/');
     document.getElementById('stock-table').innerHTML = !allStock.length ? '<div class="empty">Остатков нет</div>'
-      : `<table><thead><tr><th>Товар</th><th>Сорт</th><th>Склад</th><th style="text-align:center">Остаток</th></tr></thead><tbody>${allStock.map(s=>`<tr><td>${esc(s.category_name)}</td><td><strong>${esc(s.sort_name)}</strong></td><td>${esc(s.warehouse)}</td><td style="text-align:center"><strong class="${parseFloat(s.qty)<=0?'amount-neg':'amount-pos'}">${s.qty}</strong></td></tr>`).join('')}</tbody></table>`;
+      : `<table><thead><tr><th>Товар</th><th>Сорт</th><th>Склад</th><th style="text-align:center">Остаток</th><th>Статус</th></tr></thead><tbody>${allStock.map(s=>`<tr><td>${esc(s.category_name)}</td><td><strong>${esc(s.sort_name)}</strong></td><td>${esc(s.warehouse)}</td><td style="text-align:center"><strong class="${parseFloat(s.qty)<=0?'amount-neg':'amount-pos'}">${s.qty}</strong></td><td>${s.alert_level==='out_of_stock'?'<span class="badge badge-red">Нет</span>':s.alert_level==='low_stock'?'<span class="badge badge-yellow">Мало</span>':'<span class="badge badge-green">В норме</span>'}</td></tr>`).join('')}</tbody></table>`;
   } catch(e){toast(e.message,'error');}
 }
 async function recalculateStock() {

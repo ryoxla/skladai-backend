@@ -30,7 +30,8 @@ RECALC_SQL = """
       AND d.warehouse_id IS NOT NULL
       AND di.sort_id IS NOT NULL
     GROUP BY di.sort_id, d.warehouse_id
-    ON CONFLICT (sort_id, warehouse_id) DO UPDATE SET qty = EXCLUDED.qty
+    ON CONFLICT (sort_id, warehouse_id)
+    DO UPDATE SET qty = EXCLUDED.qty, updated_at = NOW()
 """
 
 ITEMS_SQL = """
