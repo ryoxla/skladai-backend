@@ -46,8 +46,6 @@ def stock_value(
 ):
     result = db.execute(text("""
         SELECT
-            COALESCE(SUM(s.qty * p.price_buy), 0)  as value_buy,
-            COALESCE(SUM(s.qty * p.price_sell), 0) as value_sell,
             COUNT(DISTINCT p.id) as products_count,
             COALESCE(SUM(s.qty), 0) as total_qty
         FROM stock s
