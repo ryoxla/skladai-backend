@@ -24,6 +24,24 @@ def list_stock(
     result = db.execute(text(query), params)
     return [dict(r._mapping) for r in result]
 
+@router.get("/batches")
+def list_batches(
+    warehouse_id: Optional[int] = None,
+    category_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    query = "SELECT * FROM v_stock_batches WHERE 1=1"
+    params = {}
+    if warehouse_id:
+        query += " AND warehouse_id = :wh"
+        params["wh"] = warehouse_id
+    if category_id:
+        query += " AND category_id = :cat"
+        params["cat"] = category_id
+    result = db.execute(text(query), params)
+    return [dict(r._mapping) for r in result]
+
 @router.get("/alerts")
 def stock_alerts(
     db: Session = Depends(get_db),
