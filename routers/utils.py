@@ -1,6 +1,7 @@
 RECALC_SQL = """
-    INSERT INTO stock (sort_id, warehouse_id, qty)
+    INSERT INTO stock (category_id, sort_id, warehouse_id, qty)
     SELECT
+        COALESCE(di.category_id, ps.category_id) AS category_id,
         di.sort_id,
         d.warehouse_id,
         SUM(di.qty * CASE d.doc_type
@@ -13,10 +14,11 @@ RECALC_SQL = """
         END)
     FROM document_items di
     JOIN documents d ON d.id = di.document_id
+    LEFT JOIN product_sorts ps ON ps.id = di.sort_id
     WHERE d.status = 'confirmed'
       AND d.warehouse_id IS NOT NULL
-      AND di.sort_id IS NOT NULL
-    GROUP BY di.sort_id, d.warehouse_id
-    ON CONFLICT (sort_id, warehouse_id)
+      AND COALESCE(di.category_id, ps.category_id) IS NOT NULL
+    GROUP BY COALESCE(di.category_id, ps.category_id), di.sort_id, d.warehouse_id
+    ON CONFLICT (category_id, sort_id, warehouse_id)
     DO UPDATE SET qty = EXCLUDED.qty, updated_at = NOW()
 """

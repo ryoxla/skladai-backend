@@ -112,7 +112,8 @@ class Counterparty(Base):
 class Stock(Base):
     __tablename__ = "stock"
     id           = Column(Integer, primary_key=True)
-    sort_id      = Column(Integer, ForeignKey("product_sorts.id"), nullable=False)
+    category_id  = Column(Integer, ForeignKey("product_categories.id"), nullable=False)
+    sort_id      = Column(Integer, ForeignKey("product_sorts.id"), nullable=True)
     warehouse_id = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
     qty          = Column(Numeric(15, 3), default=0)
     updated_at   = Column(DateTime(timezone=True), server_default=func.now())
@@ -142,6 +143,7 @@ class DocumentItem(Base):
     __tablename__ = "document_items"
     id          = Column(Integer, primary_key=True)
     document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
+    category_id = Column(Integer, ForeignKey("product_categories.id"))
     sort_id     = Column(Integer, ForeignKey("product_sorts.id"))
     qty         = Column(Numeric(15, 3), nullable=False)
     price       = Column(Numeric(15, 2), default=0)

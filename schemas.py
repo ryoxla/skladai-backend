@@ -112,7 +112,8 @@ class CounterpartyOut(CounterpartyBase):
 
 class StockOut(BaseModel):
     id: int
-    sort_id: int
+    category_id: int
+    sort_id: Optional[int] = None
     warehouse_id: int
     qty: Decimal
     updated_at: datetime
@@ -124,6 +125,7 @@ class StockOut(BaseModel):
 # ── ДОКУМЕНТЫ ─────────────────────────────────────────────────
 
 class DocumentItemBase(BaseModel):
+    category_id: Optional[int] = None
     sort_id: Optional[int] = None
     qty: Decimal
     price: Decimal
