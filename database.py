@@ -149,3 +149,17 @@ def run_migrations():
         logger.info("Migration 005 (document_items sort_id, nullable product_id) applied successfully")
     except Exception as e:
         logger.warning("Migration 005 skipped or failed (may be harmless): %s", e)
+
+    for _sql, _label in [
+        ("DROP TRIGGER IF EXISTS update_stock_on_document_trigger ON documents", "006a drop trigger update_stock_on_document_trigger"),
+        ("DROP TRIGGER IF EXISTS trg_update_stock_on_document ON documents", "006b drop trigger trg_update_stock_on_document"),
+        ("DROP TRIGGER IF EXISTS update_stock ON documents", "006c drop trigger update_stock"),
+        ("DROP FUNCTION IF EXISTS update_stock_on_document()", "006d drop function update_stock_on_document"),
+    ]:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(_sql))
+                conn.commit()
+            logger.info("Migration %s applied successfully", _label)
+        except Exception as e:
+            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
