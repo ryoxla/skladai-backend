@@ -297,3 +297,49 @@ def run_migrations():
         logger.info("Migration 009b (v_cashflow_monthly) applied successfully")
     except Exception as e:
         logger.warning("Migration 009b skipped or failed (may be harmless): %s", e)
+
+    for _sql, _label in [
+        ("DROP VIEW IF EXISTS v_stock_alerts", "009a drop v_stock_alerts"),
+        ("DROP TABLE IF EXISTS stock CASCADE", "009b drop stock"),
+        ("""CREATE TABLE IF NOT EXISTS stock (
+            id           SERIAL PRIMARY KEY,
+            category_id  INTEGER NOT NULL REFERENCES product_categories(id),
+            sort_id      INTEGER REFERENCES product_sorts(id),
+            warehouse_id INTEGER NOT NULL REFERENCES warehouses(id),
+            qty          NUMERIC(15,3) DEFAULT 0,
+            updated_at   TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(category_id, sort_id, warehouse_id)
+        )""", "009c create stock"),
+        (
+            "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES product_categories(id)",
+            "009d document_items.category_id",
+        ),
+        (
+            """UPDATE document_items di
+               SET category_id = ps.category_id
+               FROM product_sorts ps
+               WHERE ps.id = di.sort_id AND di.category_id IS NULL""",
+            "009e backfill category_id",
+        ),
+        ("""CREATE OR REPLACE VIEW v_stock_alerts AS
+            SELECT
+                s.id, s.category_id, s.sort_id, s.warehouse_id,
+                pc.name AS category_name,
+                COALESCE(ps.name, '—') AS sort_name,
+                w.name AS warehouse,
+                s.qty, s.updated_at
+            FROM stock s
+            JOIN product_categories pc ON pc.id = s.category_id
+            LEFT JOIN product_sorts ps  ON ps.id = s.sort_id
+            JOIN warehouses w            ON w.id = s.warehouse_id
+            WHERE pc.is_active = true""",
+            "009f v_stock_alerts",
+        ),
+    ]:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(_sql))
+                conn.commit()
+            logger.info("Migration %s applied successfully", _label)
+        except Exception as e:
+            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)

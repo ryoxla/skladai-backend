@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from decimal import Decimal
 from database import get_db
-from models import Document, DocumentItem, Counterparty, User
+from models import Document, DocumentItem, Counterparty, User, ProductSort, ProductCategory, Stock
 from schemas import DocumentCreate, DocumentUpdate, DocumentOut, MessageResponse
 from routers.auth import get_current_user, require_role
 from routers.utils import RECALC_SQL
@@ -220,6 +220,53 @@ def confirm_document(
         raise HTTPException(400, "Документ уже проведён")
     if doc.status == "cancelled":
         raise HTTPException(400, "Нельзя провести отменённый документ")
+
+    if doc.doc_type in ('shipment', 'return_out', 'writeoff'):
+        items = db.query(DocumentItem).filter(
+            DocumentItem.document_id == doc_id
+        ).all()
+        errors = []
+        for item in items:
+            cat_id = item.category_id
+            if not cat_id and item.sort_id:
+                sort = db.query(ProductSort).filter(
+                    ProductSort.id == item.sort_id
+                ).first()
+                cat_id = sort.category_id if sort else None
+            if not cat_id:
+                continue
+            stock_qty = db.execute(text("""
+                SELECT qty FROM stock
+                WHERE category_id = :cat_id
+                  AND warehouse_id = :wh_id
+                  AND (
+                    (sort_id = :sort_id) OR
+                    (sort_id IS NULL AND :sort_id IS NULL)
+                  )
+            """), {
+                "cat_id": cat_id,
+                "wh_id": doc.warehouse_id,
+                "sort_id": item.sort_id
+            }).scalar() or 0
+
+            if item.qty > stock_qty:
+                sort_name = ""
+                if item.sort_id:
+                    s = db.query(ProductSort).filter(
+                        ProductSort.id == item.sort_id
+                    ).first()
+                    sort_name = f" ({s.name})" if s else ""
+                cat = db.query(ProductCategory).filter(
+                    ProductCategory.id == cat_id
+                ).first()
+                cat_name = cat.name if cat else str(cat_id)
+                errors.append(
+                    f"{cat_name}{sort_name}: запрошено {item.qty}, доступно {stock_qty}"
+                )
+        if errors:
+            raise HTTPException(400,
+                "Недостаточно остатков: " + "; ".join(errors)
+            )
 
     try:
         doc.status = "confirmed"
