@@ -34,7 +34,6 @@ class ProductCategoryOut(ProductCategoryBase):
 class ProductSortBase(BaseModel):
     name: str
     category_id: int
-    product_id: Optional[int] = None
     is_active: bool = True
 
 class ProductSortCreate(ProductSortBase): pass
@@ -109,49 +108,22 @@ class CounterpartyOut(CounterpartyBase):
     created_at: datetime
     class Config: from_attributes = True
 
-# ── ТОВАРЫ ────────────────────────────────────────────────────
-
-class ProductBase(BaseModel):
-    name: str
-    sku: str
-    sort: Optional[str] = None
-    country: Optional[str] = None
-    category_id: Optional[int] = None
-    unit_id: int
-    vat_rate: Decimal = Decimal("20")
-    min_qty: Decimal = Decimal("0")
-    description: Optional[str] = None
-    is_active: bool = True
-
-class ProductCreate(ProductBase): pass
-class ProductUpdate(ProductBase): pass
-class ProductOut(ProductBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-    class Config: from_attributes = True
-
-class ProductWithStock(ProductOut):
-    qty: Optional[Decimal] = None
-    unit_name: Optional[str] = None
-    alert: Optional[str] = None
-
 # ── ОСТАТКИ ───────────────────────────────────────────────────
 
 class StockOut(BaseModel):
     id: int
-    product_id: int
+    sort_id: int
     warehouse_id: int
     qty: Decimal
     updated_at: datetime
-    product_name: Optional[str] = None
-    warehouse_name: Optional[str] = None
+    category_name: Optional[str] = None
+    sort_name: Optional[str] = None
+    warehouse: Optional[str] = None
     class Config: from_attributes = True
 
 # ── ДОКУМЕНТЫ ─────────────────────────────────────────────────
 
 class DocumentItemBase(BaseModel):
-    product_id: Optional[int] = None
     sort_id: Optional[int] = None
     qty: Decimal
     price: Decimal
@@ -164,7 +136,6 @@ class DocumentItemOut(DocumentItemBase):
     id: int
     amount: Optional[Decimal] = None
     vat_amount: Optional[Decimal] = None
-    product_name: Optional[str] = None
     sort_name: Optional[str] = None
     category_name: Optional[str] = None
     unit_name: Optional[str] = None

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from decimal import Decimal
 from database import get_db
-from models import Document, DocumentItem, Counterparty, Stock, User
+from models import Document, DocumentItem, Counterparty, User
 from schemas import DocumentCreate, DocumentUpdate, DocumentOut, MessageResponse
 from routers.auth import get_current_user, require_role
 from typing import List, Optional
@@ -12,30 +12,29 @@ from datetime import date, datetime, timezone
 router = APIRouter()
 
 RECALC_SQL = """
-    INSERT INTO stock (product_id, warehouse_id, qty)
+    INSERT INTO stock (sort_id, warehouse_id, qty)
     SELECT
-        COALESCE(di.product_id, ps.product_id) AS product_id,
+        di.sort_id,
         d.warehouse_id,
         SUM(di.qty * CASE d.doc_type
-            WHEN 'receipt'    THEN 1
+            WHEN 'receipt'    THEN  1
             WHEN 'shipment'   THEN -1
-            WHEN 'return_in'  THEN 1
+            WHEN 'return_in'  THEN  1
             WHEN 'return_out' THEN -1
             WHEN 'writeoff'   THEN -1
             ELSE 0
         END)
     FROM document_items di
     JOIN documents d ON d.id = di.document_id
-    LEFT JOIN product_sorts ps ON ps.id = di.sort_id AND di.product_id IS NULL
     WHERE d.status = 'confirmed'
       AND d.warehouse_id IS NOT NULL
-      AND COALESCE(di.product_id, ps.product_id) IS NOT NULL
-    GROUP BY COALESCE(di.product_id, ps.product_id), d.warehouse_id
+      AND di.sort_id IS NOT NULL
+    GROUP BY di.sort_id, d.warehouse_id
+    ON CONFLICT (sort_id, warehouse_id) DO UPDATE SET qty = EXCLUDED.qty
 """
 
 ITEMS_SQL = """
     SELECT di.*,
-           p.name as product_name,
            ps.name as sort_name,
            pc.name as category_name,
            u.short_name as unit_name,
@@ -43,7 +42,6 @@ ITEMS_SQL = """
            di.qty * di.price as amount,
            di.qty * di.price * di.vat_rate / 100 as vat_amount
     FROM document_items di
-    LEFT JOIN products p ON p.id = di.product_id
     LEFT JOIN product_sorts ps ON ps.id = di.sort_id
     LEFT JOIN product_categories pc ON pc.id = ps.category_id
     LEFT JOIN units u ON u.id = di.unit_id
