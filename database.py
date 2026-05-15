@@ -343,3 +343,63 @@ def run_migrations():
             logger.info("Migration %s applied successfully", _label)
         except Exception as e:
             logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
+
+    for _sql, _label in [
+        ("""CREATE TABLE IF NOT EXISTS stock_batches (
+            id              SERIAL PRIMARY KEY,
+            receipt_doc_id  INTEGER NOT NULL REFERENCES documents(id),
+            receipt_item_id INTEGER NOT NULL REFERENCES document_items(id),
+            category_id     INTEGER NOT NULL REFERENCES product_categories(id),
+            sort_id         INTEGER REFERENCES product_sorts(id),
+            unit_id         INTEGER REFERENCES units(id),
+            country_id      INTEGER REFERENCES countries(id),
+            warehouse_id    INTEGER NOT NULL REFERENCES warehouses(id),
+            price_in        NUMERIC(15,2) NOT NULL DEFAULT 0,
+            qty_in          NUMERIC(15,3) NOT NULL,
+            qty_left        NUMERIC(15,3) NOT NULL,
+            doc_date        DATE NOT NULL,
+            created_at      TIMESTAMPTZ DEFAULT NOW()
+        )""", "010a stock_batches"),
+        (
+            "ALTER TABLE document_items ADD COLUMN IF NOT EXISTS batch_id INTEGER REFERENCES stock_batches(id)",
+            "010b document_items.batch_id",
+        ),
+        ("""CREATE OR REPLACE VIEW v_stock_batches AS
+            SELECT
+                sb.id,
+                sb.receipt_doc_id,
+                sb.receipt_item_id,
+                sb.category_id,
+                sb.sort_id,
+                sb.unit_id,
+                sb.country_id,
+                sb.warehouse_id,
+                sb.price_in,
+                sb.qty_in,
+                sb.qty_left,
+                sb.doc_date,
+                d.doc_number  AS receipt_number,
+                pc.name       AS category_name,
+                ps.name       AS sort_name,
+                u.short_name  AS unit_name,
+                c.name        AS country_name,
+                w.name        AS warehouse_name
+            FROM stock_batches sb
+            JOIN documents d           ON d.id = sb.receipt_doc_id
+            JOIN product_categories pc ON pc.id = sb.category_id
+            LEFT JOIN product_sorts ps ON ps.id = sb.sort_id
+            LEFT JOIN units u          ON u.id = sb.unit_id
+            LEFT JOIN countries c      ON c.id = sb.country_id
+            JOIN warehouses w          ON w.id = sb.warehouse_id
+            WHERE sb.qty_left > 0
+            ORDER BY sb.doc_date ASC, sb.id ASC""",
+            "010c v_stock_batches",
+        ),
+    ]:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(_sql))
+                conn.commit()
+            logger.info("Migration %s applied successfully", _label)
+        except Exception as e:
+            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)

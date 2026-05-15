@@ -124,9 +124,29 @@ class StockOut(BaseModel):
 
 # ── ДОКУМЕНТЫ ─────────────────────────────────────────────────
 
+class StockBatchOut(BaseModel):
+    id: int
+    receipt_doc_id: int
+    receipt_number: Optional[str] = None
+    category_id: int
+    category_name: Optional[str] = None
+    sort_id: Optional[int] = None
+    sort_name: Optional[str] = None
+    unit_id: Optional[int] = None
+    unit_name: Optional[str] = None
+    country_id: Optional[int] = None
+    country_name: Optional[str] = None
+    warehouse_id: int
+    price_in: Decimal
+    qty_in: Decimal
+    qty_left: Decimal
+    doc_date: date
+    class Config: from_attributes = True
+
 class DocumentItemBase(BaseModel):
     category_id: Optional[int] = None
     sort_id: Optional[int] = None
+    batch_id: Optional[int] = None
     qty: Decimal
     price: Decimal
     vat_rate: Decimal = Decimal("20")

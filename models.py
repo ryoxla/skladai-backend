@@ -120,6 +120,22 @@ class Stock(Base):
 
 # ── ДОКУМЕНТЫ ─────────────────────────────────────────────────
 
+class StockBatch(Base):
+    __tablename__ = "stock_batches"
+    id              = Column(Integer, primary_key=True)
+    receipt_doc_id  = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    receipt_item_id = Column(Integer, ForeignKey("document_items.id"), nullable=False)
+    category_id     = Column(Integer, ForeignKey("product_categories.id"), nullable=False)
+    sort_id         = Column(Integer, ForeignKey("product_sorts.id"))
+    unit_id         = Column(Integer, ForeignKey("units.id"))
+    country_id      = Column(Integer, ForeignKey("countries.id"))
+    warehouse_id    = Column(Integer, ForeignKey("warehouses.id"), nullable=False)
+    price_in        = Column(Numeric(15, 2), default=0)
+    qty_in          = Column(Numeric(15, 3), nullable=False)
+    qty_left        = Column(Numeric(15, 3), nullable=False)
+    doc_date        = Column(Date, nullable=False)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
 class Document(Base):
     __tablename__ = "documents"
     id               = Column(Integer, primary_key=True)
@@ -145,6 +161,7 @@ class DocumentItem(Base):
     document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     category_id = Column(Integer, ForeignKey("product_categories.id"))
     sort_id     = Column(Integer, ForeignKey("product_sorts.id"))
+    batch_id    = Column(Integer, ForeignKey("stock_batches.id"))
     qty         = Column(Numeric(15, 3), nullable=False)
     price       = Column(Numeric(15, 2), default=0)
     vat_rate    = Column(Numeric(5, 2), default=20)

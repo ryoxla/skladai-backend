@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from decimal import Decimal
 from database import get_db
-from models import Document, DocumentItem, Counterparty, User, ProductSort, ProductCategory, Stock
+from models import Document, DocumentItem, Counterparty, User, ProductSort, ProductCategory, Stock, StockBatch
 from schemas import DocumentCreate, DocumentUpdate, DocumentOut, MessageResponse
 from routers.auth import get_current_user, require_role
 from routers.utils import RECALC_SQL
@@ -222,10 +222,54 @@ def confirm_document(
         raise HTTPException(400, "Нельзя провести отменённый документ")
 
     if doc.doc_type in ('shipment', 'return_out', 'writeoff'):
+        if not doc.warehouse_id:
+            raise HTTPException(400, "Для расходной накладной необходимо выбрать склад")
+        if not doc.counterparty_id:
+            raise HTTPException(400, "Для расходной накладной необходимо выбрать контрагента")
+
         items = db.query(DocumentItem).filter(
             DocumentItem.document_id == doc_id
         ).all()
         errors = []
+        for item in items:
+            if not item.batch_id:
+                errors.append("Позиция не привязана к партии")
+                continue
+            batch = db.query(StockBatch).filter(
+                StockBatch.id == item.batch_id
+            ).first()
+            if not batch:
+                errors.append(f"Партия не найдена (id={item.batch_id})")
+                continue
+            if item.qty > batch.qty_left:
+                cat = db.query(ProductCategory).filter(
+                    ProductCategory.id == batch.category_id
+                ).first()
+                cat_name = cat.name if cat else str(batch.category_id)
+                sort_name = ""
+                if batch.sort_id:
+                    s = db.query(ProductSort).filter(ProductSort.id == batch.sort_id).first()
+                    sort_name = f" ({s.name})" if s else ""
+                errors.append(
+                    f"{cat_name}{sort_name}: запрошено {item.qty}, доступно {batch.qty_left}"
+                )
+                continue
+            batch.qty_left -= item.qty
+        if errors:
+            raise HTTPException(400, "Ошибки списания: " + "; ".join(errors))
+
+    try:
+        doc.status = "confirmed"
+        doc.confirmed_at = datetime.now(timezone.utc)
+        db.flush()
+    except Exception as e:
+        logger.error("confirm_document flush error doc_id=%s: %s", doc_id, e, exc_info=True)
+        raise HTTPException(500, f"Ошибка при сохранении статуса документа: {e}")
+
+    if doc.doc_type in ('receipt', 'return_in'):
+        items = db.query(DocumentItem).filter(
+            DocumentItem.document_id == doc_id
+        ).all()
         for item in items:
             cat_id = item.category_id
             if not cat_id and item.sort_id:
@@ -235,46 +279,24 @@ def confirm_document(
                 cat_id = sort.category_id if sort else None
             if not cat_id:
                 continue
-            stock_qty = db.execute(text("""
-                SELECT qty FROM stock
-                WHERE category_id = :cat_id
-                  AND warehouse_id = :wh_id
-                  AND (
-                    (sort_id = :sort_id) OR
-                    (sort_id IS NULL AND :sort_id IS NULL)
-                  )
-            """), {
-                "cat_id": cat_id,
-                "wh_id": doc.warehouse_id,
-                "sort_id": item.sort_id
-            }).scalar() or 0
-
-            if item.qty > stock_qty:
-                sort_name = ""
-                if item.sort_id:
-                    s = db.query(ProductSort).filter(
-                        ProductSort.id == item.sort_id
-                    ).first()
-                    sort_name = f" ({s.name})" if s else ""
-                cat = db.query(ProductCategory).filter(
-                    ProductCategory.id == cat_id
-                ).first()
-                cat_name = cat.name if cat else str(cat_id)
-                errors.append(
-                    f"{cat_name}{sort_name}: запрошено {item.qty}, доступно {stock_qty}"
+            existing = db.query(StockBatch).filter(
+                StockBatch.receipt_item_id == item.id
+            ).first()
+            if not existing:
+                batch = StockBatch(
+                    receipt_doc_id  = doc_id,
+                    receipt_item_id = item.id,
+                    category_id     = cat_id,
+                    sort_id         = item.sort_id,
+                    unit_id         = item.unit_id,
+                    country_id      = item.country_id,
+                    warehouse_id    = doc.warehouse_id,
+                    price_in        = item.price,
+                    qty_in          = item.qty,
+                    qty_left        = item.qty,
+                    doc_date        = doc.doc_date,
                 )
-        if errors:
-            raise HTTPException(400,
-                "Недостаточно остатков: " + "; ".join(errors)
-            )
-
-    try:
-        doc.status = "confirmed"
-        doc.confirmed_at = datetime.now(timezone.utc)
-        db.flush()
-    except Exception as e:
-        logger.error("confirm_document flush error doc_id=%s: %s", doc_id, e, exc_info=True)
-        raise HTTPException(500, f"Ошибка при сохранении статуса документа: {e}")
+                db.add(batch)
 
     try:
         recalculate_stock(db)
@@ -303,6 +325,35 @@ def cancel_document(
         raise HTTPException(404, "Документ не найден")
     if doc.status != "confirmed":
         raise HTTPException(400, "Можно отменить только проведённый документ")
+
+    if doc.doc_type in ('receipt', 'return_in'):
+        items = db.query(DocumentItem).filter(
+            DocumentItem.document_id == doc_id
+        ).all()
+        for item in items:
+            batch = db.query(StockBatch).filter(
+                StockBatch.receipt_item_id == item.id
+            ).first()
+            if batch:
+                if batch.qty_left < batch.qty_in:
+                    raise HTTPException(400,
+                        f"Нельзя отменить приход: с партии уже списано "
+                        f"{batch.qty_in - batch.qty_left} единиц"
+                    )
+                db.delete(batch)
+
+    if doc.doc_type in ('shipment', 'return_out', 'writeoff'):
+        items = db.query(DocumentItem).filter(
+            DocumentItem.document_id == doc_id
+        ).all()
+        for item in items:
+            if item.batch_id:
+                batch = db.query(StockBatch).filter(
+                    StockBatch.id == item.batch_id
+                ).first()
+                if batch:
+                    batch.qty_left += item.qty
+
     doc.status = "draft"
     db.flush()
 
