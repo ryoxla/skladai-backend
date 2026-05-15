@@ -57,6 +57,7 @@ class ProductSort(Base):
     id          = Column(Integer, primary_key=True)
     name        = Column(String(100), nullable=False)
     category_id = Column(Integer, ForeignKey("product_categories.id"), nullable=False)
+    product_id  = Column(Integer, ForeignKey("products.id"))
     is_active   = Column(Boolean, default=True)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
     category    = relationship("ProductCategory", back_populates="sorts")

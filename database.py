@@ -163,3 +163,42 @@ def run_migrations():
             logger.info("Migration %s applied successfully", _label)
         except Exception as e:
             logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
+
+    for _sql, _label in [
+        (
+            "ALTER TABLE product_sorts ADD COLUMN IF NOT EXISTS product_id INTEGER REFERENCES products(id)",
+            "007a product_sorts.product_id",
+        ),
+        (
+            """CREATE OR REPLACE VIEW v_stock_alerts AS
+            SELECT
+                s.id,
+                s.product_id,
+                s.warehouse_id,
+                p.name,
+                p.sku,
+                p.min_qty,
+                u.short_name AS unit_name,
+                w.name AS warehouse_name,
+                s.qty,
+                CASE
+                    WHEN s.qty = 0          THEN 'out_of_stock'
+                    WHEN s.qty <= p.min_qty THEN 'low_stock'
+                    ELSE 'ok'
+                END AS alert_level,
+                s.updated_at
+            FROM stock s
+            JOIN products p ON p.id = s.product_id
+            JOIN warehouses w ON w.id = s.warehouse_id
+            LEFT JOIN units u ON u.id = p.unit_id
+            WHERE p.is_active = true""",
+            "007b v_stock_alerts view",
+        ),
+    ]:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text(_sql))
+                conn.commit()
+            logger.info("Migration %s applied successfully", _label)
+        except Exception as e:
+            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
