@@ -68,8 +68,7 @@ def create_sort(
         raise HTTPException(404, "Товар не найден")
     s = ProductSort(name=data.name, category_id=data.category_id, is_active=data.is_active)
     db.add(s)
-    db.commit()
-    db.refresh(s)
+    db.flush()
     return {"message": "Сорт создан", "id": s.id}
 
 

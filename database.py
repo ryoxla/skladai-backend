@@ -164,41 +164,66 @@ def run_migrations():
         except Exception as e:
             logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
 
-    for _sql, _label in [
-        (
-            "ALTER TABLE product_sorts ADD COLUMN IF NOT EXISTS product_id INTEGER REFERENCES products(id)",
-            "007a product_sorts.product_id",
-        ),
-        (
-            """CREATE OR REPLACE VIEW v_stock_alerts AS
-            SELECT
-                s.id,
-                s.product_id,
-                s.warehouse_id,
-                p.name,
-                p.sku,
-                p.min_qty,
-                u.short_name AS unit_name,
-                w.name AS warehouse_name,
-                s.qty,
-                CASE
-                    WHEN s.qty = 0          THEN 'out_of_stock'
-                    WHEN s.qty <= p.min_qty THEN 'low_stock'
-                    ELSE 'ok'
-                END AS alert_level,
-                s.updated_at
-            FROM stock s
-            JOIN products p ON p.id = s.product_id
-            JOIN warehouses w ON w.id = s.warehouse_id
-            LEFT JOIN units u ON u.id = p.unit_id
-            WHERE p.is_active = true""",
-            "007b v_stock_alerts view",
-        ),
-    ]:
-        try:
-            with engine.connect() as conn:
-                conn.execute(text(_sql))
-                conn.commit()
-            logger.info("Migration %s applied successfully", _label)
-        except Exception as e:
-            logger.warning("Migration %s skipped or failed (may be harmless): %s", _label, e)
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE OR REPLACE VIEW v_stock_alerts AS
+                SELECT
+                    s.id,
+                    s.sort_id,
+                    s.warehouse_id,
+                    ps.name AS sort_name,
+                    pc.name AS category_name,
+                    w.name AS warehouse_name,
+                    s.qty,
+                    CASE
+                        WHEN s.qty <= 0 THEN 'out_of_stock'
+                        ELSE 'ok'
+                    END AS alert_level,
+                    s.updated_at
+                FROM stock s
+                JOIN product_sorts ps ON ps.id = s.sort_id
+                JOIN product_categories pc ON pc.id = ps.category_id
+                JOIN warehouses w ON w.id = s.warehouse_id
+                WHERE ps.is_active = true
+            """))
+            conn.commit()
+        logger.info("Migration 008a (v_stock_alerts) applied successfully")
+    except Exception as e:
+        logger.warning("Migration 008a skipped or failed (may be harmless): %s", e)
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE OR REPLACE VIEW v_counterparty_balances AS
+                SELECT
+                    id,
+                    name,
+                    type,
+                    balance,
+                    is_active
+                FROM counterparties
+                WHERE is_active = true
+            """))
+            conn.commit()
+        logger.info("Migration 009a (v_counterparty_balances) applied successfully")
+    except Exception as e:
+        logger.warning("Migration 009a skipped or failed (may be harmless): %s", e)
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE OR REPLACE VIEW v_cashflow_monthly AS
+                SELECT
+                    DATE_TRUNC('month', txn_date) AS month,
+                    SUM(CASE WHEN txn_type = 'income'  THEN amount ELSE 0 END) AS income,
+                    SUM(CASE WHEN txn_type = 'expense' THEN amount ELSE 0 END) AS expense
+                FROM transactions
+                WHERE status = 'confirmed'
+                GROUP BY 1
+                ORDER BY 1 DESC
+            """))
+            conn.commit()
+        logger.info("Migration 009b (v_cashflow_monthly) applied successfully")
+    except Exception as e:
+        logger.warning("Migration 009b skipped or failed (may be harmless): %s", e)
