@@ -163,8 +163,11 @@ select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='ht
       <button class="btn btn-ghost" onclick="refreshCurrentPage()">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Обновить
       </button>
-      <button class="btn btn-primary" id="add-btn" onclick="openAddModal()">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить
+      <button class="btn btn-ghost" id="add-btn" onclick="openAddModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Приходная
+      </button>
+      <button class="btn btn-primary" id="add-shipment-btn" onclick="openAddShipment()" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Расходная
       </button>
     </div>
   </div>
@@ -288,7 +291,21 @@ function showPage(name, el) {
   currentPage = name;
   const titles = {dashboard:'Дашборд',stock:'Остатки на складе',counterparties:'Контрагенты',documents:'Накладные',finance:'Финансы',accounts:'Счета и кассы',users:'Пользователи',catalogs:'Справочники'};
   document.getElementById('page-title').textContent = titles[name]||name;
-  document.getElementById('add-btn').style.display = (name==='dashboard'||name==='stock') ? 'none' : '';
+  const isDocPage = name === 'documents';
+  const hiddenPages = ['dashboard', 'stock'];
+  const addBtn = document.getElementById('add-btn');
+  const addShipBtn = document.getElementById('add-shipment-btn');
+  addBtn.style.display = hiddenPages.includes(name) ? 'none' : '';
+  addShipBtn.style.display = isDocPage ? '' : 'none';
+  if (isDocPage) {
+    addBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Приходная`;
+    addBtn.className = 'btn btn-ghost';
+    addBtn.onclick = openAddDoc;
+  } else {
+    addBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Добавить`;
+    addBtn.className = 'btn btn-primary';
+    addBtn.onclick = openAddModal;
+  }
   loadPage(name);
 }
 
@@ -306,18 +323,8 @@ function loadPage(name) {
 }
 
 function openAddModal() {
-  const fns = {counterparties:openAddCP,documents:openAddDocByType,finance:openAddTxn,accounts:openAddAccount,users:openAddUser,catalogs:openAddCatalogItem};
+  const fns = {counterparties:openAddCP,documents:openAddDoc,finance:openAddTxn,accounts:openAddAccount,users:openAddUser,catalogs:openAddCatalogItem};
   if(fns[currentPage]) fns[currentPage]();
-}
-
-function openAddDocByType() {
-  const activeFilter = document.querySelector('#page-documents .filter-btn.active');
-  const filterText = activeFilter?.textContent || '';
-  if (filterText === 'Расходные') {
-    openAddShipment();
-  } else {
-    openAddDoc();
-  }
 }
 
 async function openAddShipment() {
