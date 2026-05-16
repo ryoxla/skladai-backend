@@ -164,6 +164,14 @@ def update_document(
     if not doc:
         raise HTTPException(404, "Документ не найден")
 
+    if (doc.status == 'confirmed'
+            and doc.doc_type in ('receipt', 'return_in')
+            and data.items is not None):
+        raise HTTPException(400,
+            "Нельзя изменить позиции проведённой приходной накладной. "
+            "Сначала отмените проведение через кнопку 'Отменить'."
+        )
+
     was_confirmed = doc.status == "confirmed"
     old_counterparty_id = doc.counterparty_id
 
@@ -179,6 +187,18 @@ def update_document(
         doc.status = data.status
 
     if data.items is not None:
+        if doc.doc_type in ('shipment', 'return_out', 'writeoff') and was_confirmed:
+            old_items = db.query(DocumentItem).filter(
+                DocumentItem.document_id == doc_id
+            ).all()
+            for old_item in old_items:
+                if old_item.batch_id:
+                    batch = db.query(StockBatch).filter(
+                        StockBatch.id == old_item.batch_id
+                    ).first()
+                    if batch:
+                        batch.qty_left += old_item.qty
+
         db.query(DocumentItem).filter(DocumentItem.document_id == doc_id).delete()
         total = Decimal("0")
         total_vat = Decimal("0")
@@ -194,12 +214,12 @@ def update_document(
 
     db.flush()
 
-    if doc.doc_type in ('shipment', 'return_out', 'writeoff') and data.items is not None:
-        items = db.query(DocumentItem).filter(
+    if doc.status == 'confirmed' and doc.doc_type in ('shipment', 'return_out', 'writeoff') and data.items is not None:
+        new_items = db.query(DocumentItem).filter(
             DocumentItem.document_id == doc_id
         ).all()
         errors = []
-        for item in items:
+        for item in new_items:
             if not item.batch_id:
                 continue
             batch = db.query(StockBatch).filter(
@@ -207,29 +227,16 @@ def update_document(
             ).first()
             if not batch:
                 continue
-            other_shipments_qty = db.execute(text("""
-                SELECT COALESCE(SUM(di.qty), 0)
-                FROM document_items di
-                JOIN documents d ON d.id = di.document_id
-                WHERE di.batch_id = :batch_id
-                  AND d.status = 'confirmed'
-                  AND di.document_id != :doc_id
-            """), {"batch_id": item.batch_id, "doc_id": doc_id}).scalar() or Decimal("0")
-            available = batch.qty_in - other_shipments_qty
-            if item.qty > available:
+            if item.qty > batch.qty_left:
                 cat = db.query(ProductCategory).filter(
                     ProductCategory.id == batch.category_id
                 ).first()
-                cat_name = cat.name if cat else str(batch.category_id)
-                sort_name = ""
-                if batch.sort_id:
-                    s = db.query(ProductSort).filter(
-                        ProductSort.id == batch.sort_id
-                    ).first()
-                    sort_name = f" ({s.name})" if s else ""
                 errors.append(
-                    f"{cat_name}{sort_name}: запрошено {item.qty}, доступно {available}"
+                    f"{cat.name if cat else batch.category_id}: "
+                    f"запрошено {item.qty}, доступно {batch.qty_left}"
                 )
+                continue
+            batch.qty_left -= item.qty
         if errors:
             raise HTTPException(400,
                 "Недостаточно остатков: " + "; ".join(errors)
@@ -376,10 +383,29 @@ def cancel_document(
                 StockBatch.receipt_item_id == item.id
             ).first()
             if batch:
-                if batch.qty_left < batch.qty_in:
+                active_shipments = db.execute(text("""
+                    SELECT COALESCE(SUM(di.qty), 0)
+                    FROM document_items di
+                    JOIN documents d ON d.id = di.document_id
+                    WHERE di.batch_id = :batch_id
+                      AND d.status = 'confirmed'
+                """), {"batch_id": batch.id}).scalar() or Decimal("0")
+
+                if active_shipments > 0:
+                    cat = db.query(ProductCategory).filter(
+                        ProductCategory.id == batch.category_id
+                    ).first()
+                    cat_name = cat.name if cat else str(batch.category_id)
+                    sort_name = ""
+                    if batch.sort_id:
+                        s = db.query(ProductSort).filter(
+                            ProductSort.id == batch.sort_id
+                        ).first()
+                        sort_name = f" ({s.name})" if s else ""
                     raise HTTPException(400,
-                        f"Нельзя отменить приход: с партии уже списано "
-                        f"{batch.qty_in - batch.qty_left} единиц"
+                        f"Нельзя отменить приход: по партии {cat_name}{sort_name} "
+                        f"есть проведённые расходные на {active_shipments} единиц. "
+                        f"Сначала отмените расходные накладные."
                     )
                 db.delete(batch)
 
@@ -394,6 +420,7 @@ def cancel_document(
                 ).first()
                 if batch:
                     batch.qty_left += item.qty
+            item.batch_id = None
 
     doc.status = "draft"
     db.flush()
