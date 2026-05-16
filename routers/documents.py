@@ -164,14 +164,6 @@ def update_document(
     if not doc:
         raise HTTPException(404, "Документ не найден")
 
-    if (doc.status == 'confirmed'
-            and doc.doc_type in ('receipt', 'return_in')
-            and data.items is not None):
-        raise HTTPException(400,
-            "Нельзя изменить позиции проведённой приходной накладной. "
-            "Сначала отмените проведение через кнопку 'Отменить'."
-        )
-
     was_confirmed = doc.status == "confirmed"
     old_counterparty_id = doc.counterparty_id
 
@@ -240,6 +232,99 @@ def update_document(
         if errors:
             raise HTTPException(400,
                 "Недостаточно остатков: " + "; ".join(errors)
+            )
+
+    if data.items is not None and doc.doc_type in ('receipt', 'return_in') and doc.status == 'confirmed':
+        new_items = db.query(DocumentItem).filter(
+            DocumentItem.document_id == doc_id
+        ).all()
+
+        errors = []
+        for item in new_items:
+            cat_id = item.category_id
+            if not cat_id and item.sort_id:
+                sort = db.query(ProductSort).filter(
+                    ProductSort.id == item.sort_id
+                ).first()
+                cat_id = sort.category_id if sort else None
+
+            batch = db.execute(text("""
+                SELECT * FROM stock_batches
+                WHERE receipt_doc_id = :doc_id
+                  AND category_id = :cat_id
+                  AND (sort_id = :sort_id OR (sort_id IS NULL AND :sort_id IS NULL))
+                  AND warehouse_id = :wh_id
+                LIMIT 1
+            """), {
+                "doc_id": doc_id,
+                "cat_id": cat_id,
+                "sort_id": item.sort_id,
+                "wh_id": doc.warehouse_id
+            }).mappings().one_or_none()
+
+            if not batch:
+                if cat_id:
+                    new_batch = StockBatch(
+                        receipt_doc_id  = doc_id,
+                        receipt_item_id = item.id,
+                        category_id     = cat_id,
+                        sort_id         = item.sort_id,
+                        unit_id         = item.unit_id,
+                        country_id      = item.country_id,
+                        warehouse_id    = doc.warehouse_id,
+                        price_in        = item.price,
+                        qty_in          = item.qty,
+                        qty_left        = item.qty,
+                        doc_date        = doc.doc_date,
+                    )
+                    db.add(new_batch)
+                continue
+
+            shipped_qty = db.execute(text("""
+                SELECT COALESCE(SUM(di.qty), 0)
+                FROM document_items di
+                JOIN documents d ON d.id = di.document_id
+                WHERE di.batch_id = :batch_id
+                  AND d.status = 'confirmed'
+            """), {"batch_id": batch["id"]}).scalar() or Decimal("0")
+
+            if item.qty < shipped_qty:
+                cat = db.query(ProductCategory).filter(
+                    ProductCategory.id == cat_id
+                ).first()
+                cat_name = cat.name if cat else str(cat_id)
+                sort_name = ""
+                if item.sort_id:
+                    s = db.query(ProductSort).filter(
+                        ProductSort.id == item.sort_id
+                    ).first()
+                    sort_name = f" ({s.name})" if s else ""
+                errors.append(
+                    f"{cat_name}{sort_name}: нельзя уменьшить до {item.qty} — "
+                    f"уже списано {shipped_qty}"
+                )
+                continue
+
+            db.execute(text("""
+                UPDATE stock_batches
+                SET qty_in          = :qty_in,
+                    qty_left        = :qty_left,
+                    price_in        = :price_in,
+                    receipt_item_id = :item_id,
+                    doc_date        = :doc_date
+                WHERE id = :batch_id
+            """), {
+                "qty_in":   item.qty,
+                "qty_left": item.qty - shipped_qty,
+                "price_in": item.price,
+                "item_id":  item.id,
+                "doc_date": doc.doc_date,
+                "batch_id": batch["id"]
+            })
+
+        if errors:
+            raise HTTPException(400,
+                "Ошибка редактирования: " + "; ".join(errors)
             )
 
     # Пересчёт остатков
