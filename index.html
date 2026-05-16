@@ -393,6 +393,151 @@ async function openAddShipment() {
   );
 }
 
+async function editShipment(doc) {
+  const [cps, warehouses, batches] = await Promise.all([
+    api('/counterparties/'),
+    api('/warehouses/'),
+    doc.warehouse_id ? api(`/stock/batches?warehouse_id=${doc.warehouse_id}`) : Promise.resolve([])
+  ]);
+
+  const enrichedBatches = batches.map(b => {
+    const existingItem = (doc.items || []).find(i => i.batch_id === b.id);
+    const currentQty = existingItem ? +existingItem.qty : 0;
+    return {
+      ...b,
+      qty_left: +b.qty_left + currentQty,
+      qty_sell: currentQty,
+      price_sell: existingItem ? +existingItem.price : 0
+    };
+  });
+
+  window._shipmentBatches = enrichedBatches;
+
+  openModal('Редактировать расходную накладную',
+    `<div class="form-row">
+      <div class="form-group">
+        <label>Номер</label>
+        <input id="f-num" value="${esc(doc.doc_number)}" readonly style="opacity:.5">
+      </div>
+      <div class="form-group">
+        <label>Дата</label>
+        <input id="f-date" type="date" value="${doc.doc_date}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Контрагент *</label>
+        <select id="f-cp">
+          <option value="">— выберите —</option>
+          ${cps.map(c => `<option value="${c.id}"${c.id==doc.counterparty_id?' selected':''}>${esc(c.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Склад *</label>
+        <select id="f-wh" onchange="reloadBatchesForEdit(${doc.id})">
+          <option value="">— выберите —</option>
+          ${warehouses.map(w => `<option value="${w.id}"${w.id==doc.warehouse_id?' selected':''}>${esc(w.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Примечание</label>
+      <input id="f-notes" value="${esc(doc.notes||'')}" placeholder="Необязательно">
+    </div>
+    <div id="shipment-batches">
+      ${renderBatchesTable(enrichedBatches)}
+    </div>
+    <div class="items-total" id="doc-total">Итого: ${fmt(enrichedBatches.reduce((s,b)=>s+(b.qty_sell*b.price_sell),0))}</div>`,
+    async () => {
+      const cpId = +document.getElementById('f-cp').value;
+      const whId = +document.getElementById('f-wh').value;
+      if (!cpId) throw new Error('Выберите контрагента');
+      if (!whId) throw new Error('Выберите склад');
+      const items = getShipmentItems();
+      if (!items.length) throw new Error('Добавьте хотя бы одну позицию');
+      const data = {
+        doc_date: document.getElementById('f-date').value,
+        counterparty_id: cpId,
+        warehouse_id: whId,
+        notes: document.getElementById('f-notes').value || null,
+        status: doc.status,
+        items
+      };
+      await api('/documents/' + doc.id, 'PUT', data);
+      toast('Расходная накладная обновлена');
+      loadDocs();
+    }, true
+  );
+}
+
+async function reloadBatchesForEdit(docId) {
+  const whId = +document.getElementById('f-wh').value;
+  const el = document.getElementById('shipment-batches');
+  if (!whId) return;
+  el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const doc = await api('/documents/' + docId);
+    const batches = await api(`/stock/batches?warehouse_id=${whId}`);
+    const enrichedBatches = batches.map(b => {
+      const existingItem = (doc.items || []).find(i => i.batch_id === b.id);
+      const currentQty = existingItem ? +existingItem.qty : 0;
+      return {
+        ...b,
+        qty_left: +b.qty_left + currentQty,
+        qty_sell: currentQty,
+        price_sell: existingItem ? +existingItem.price : 0
+      };
+    });
+    window._shipmentBatches = enrichedBatches;
+    el.innerHTML = renderBatchesTable(enrichedBatches);
+    updateShipmentTotal();
+  } catch(e) {
+    el.innerHTML = `<div class="empty">Ошибка загрузки: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderBatchesTable(batches) {
+  if (!batches.length) return '<div class="empty">На складе нет остатков</div>';
+  return `
+    <div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em">
+      Остатки на складе
+    </div>
+    <table class="items-table">
+      <thead><tr>
+        <th>Товар</th><th>Сорт</th><th>Ед.</th><th>Страна</th>
+        <th>Приход</th><th>Дата</th>
+        <th style="text-align:right">Закуп. цена</th>
+        <th style="text-align:right">Доступно</th>
+        <th>Кол-во продажи</th>
+        <th>Цена продажи</th>
+        <th style="text-align:right">Сумма</th>
+      </tr></thead>
+      <tbody>
+      ${batches.map((b, i) => `<tr>
+        <td>${esc(b.category_name)}</td>
+        <td>${esc(b.sort_name || '—')}</td>
+        <td>${esc(b.unit_name || '—')}</td>
+        <td>${esc(b.country_name || '—')}</td>
+        <td class="mono">${esc(b.receipt_number)}</td>
+        <td class="mono">${fmtDate(b.doc_date)}</td>
+        <td style="text-align:right" class="amount-neu mono">${b.price_in}</td>
+        <td style="text-align:right"><strong class="${+b.qty_left <= 0 ? 'amount-neg' : 'amount-pos'}">${b.qty_left}</strong></td>
+        <td>
+          <input type="number" min="0" step="0.001" max="${b.qty_left}"
+            value="${b.qty_sell || 0}" style="width:80px" oninput="onBatchQty(${i}, this)">
+        </td>
+        <td>
+          <input type="number" min="0" step="0.01"
+            value="${b.price_sell || 0}" style="width:90px" oninput="onBatchPrice(${i}, this)">
+        </td>
+        <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px" id="batch-sum-${i}">
+          ${fmt((b.qty_sell || 0) * (b.price_sell || 0))}
+        </td>
+      </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
 async function loadBatchesForShipment() {
   const whId = +document.getElementById('f-wh').value;
   const el = document.getElementById('shipment-batches');
@@ -400,50 +545,9 @@ async function loadBatchesForShipment() {
   el.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   try {
     const batches = await api(`/stock/batches?warehouse_id=${whId}`);
-    if (!batches.length) {
-      el.innerHTML = '<div class="empty">На складе нет остатков</div>';
-      return;
-    }
     batches.forEach(b => { b.qty_sell = 0; b.price_sell = 0; });
     window._shipmentBatches = batches;
-    el.innerHTML = `
-      <div style="margin:12px 0 6px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em">
-        Остатки на складе
-      </div>
-      <table class="items-table">
-        <thead><tr>
-          <th>Товар</th><th>Сорт</th><th>Ед.</th><th>Страна</th>
-          <th>Приход</th><th>Дата</th>
-          <th style="text-align:right">Закуп. цена</th>
-          <th style="text-align:right">Остаток</th>
-          <th>Кол-во продажи</th>
-          <th>Цена продажи</th>
-          <th style="text-align:right">Сумма</th>
-        </tr></thead>
-        <tbody>
-        ${batches.map((b, i) => `<tr>
-          <td>${esc(b.category_name)}</td>
-          <td>${esc(b.sort_name || '—')}</td>
-          <td>${esc(b.unit_name || '—')}</td>
-          <td>${esc(b.country_name || '—')}</td>
-          <td class="mono">${esc(b.receipt_number)}</td>
-          <td class="mono">${fmtDate(b.doc_date)}</td>
-          <td style="text-align:right" class="amount-neu mono">${b.price_in}</td>
-          <td style="text-align:right"><strong class="amount-pos">${b.qty_left}</strong></td>
-          <td>
-            <input type="number" min="0" step="0.001" max="${b.qty_left}"
-              value="0" style="width:80px" oninput="onBatchQty(${i}, this)">
-          </td>
-          <td>
-            <input type="number" min="0" step="0.01"
-              value="0" style="width:90px" oninput="onBatchPrice(${i}, this)">
-          </td>
-          <td style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px" id="batch-sum-${i}">
-            ${fmt(0)}
-          </td>
-        </tr>`).join('')}
-        </tbody>
-      </table>`;
+    el.innerHTML = renderBatchesTable(batches);
     updateShipmentTotal();
   } catch(e) {
     el.innerHTML = `<div class="empty">Ошибка загрузки: ${esc(e.message)}</div>`;
@@ -818,8 +922,12 @@ async function openAddDoc() {
 }
 
 async function editDoc(id) {
-  const [doc,cps,warehouses,categories,units,countries,sorts,stock] = await Promise.all([
-    api('/documents/'+id),api('/counterparties/'),api('/warehouses/'),
+  const doc = await api('/documents/' + id);
+  if (['shipment', 'return_out', 'writeoff'].includes(doc.doc_type)) {
+    return editShipment(doc);
+  }
+  const [cps,warehouses,categories,units,countries,sorts,stock] = await Promise.all([
+    api('/counterparties/'),api('/warehouses/'),
     api('/categories/'),api('/units/'),api('/countries/'),api('/sorts/'),
     api('/stock/')
   ]);
